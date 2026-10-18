@@ -48,5 +48,13 @@ echo.
 echo ====================================================
 echo ✅ ¡Instalación completada con éxito en Windows!
 echo 👉 Encontrarás el icono "Spotlight Music" en tu Escritorio.
+echo 🚀 Iniciando Spotlight Music en tu pantalla...
 echo ====================================================
-pause
+
+if exist "%~dp0SpotlightMusic.exe" (
+    start "" "%~dp0SpotlightMusic.exe"
+) else (
+    start "" pythonw.exe "%~dp0main.py"
+)
+
+timeout /t 3 >nul

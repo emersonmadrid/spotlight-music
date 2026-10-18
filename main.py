@@ -41,6 +41,12 @@ if hasattr(sys.stdout, "reconfigure"):
 import player
 import lyrics
 
+try:
+    import tkinter as tk
+    from tkinter import ttk, scrolledtext
+except ImportError:
+    tk = None
+
 
 def show_spotlight_player(initial_query=""):
     """Lanza la ventana flotante Spotlight / Raycast."""
@@ -511,6 +517,8 @@ Uso:
 def main():
     args = sys.argv[1:]
     if not args:
+        show_spotlight_player()
+    elif args[0] in ("tray", "--tray"):
         run_tray()
     elif args[0] in ("search", "gui", "-s"):
         q = " ".join(args[1:]) if len(args) > 1 else ""
