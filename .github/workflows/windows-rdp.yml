@@ -1,0 +1,84 @@
+name: Windows Remote Desktop (RDP)
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration_minutes:
+        description: 'Duración de la sesión en minutos (máximo 360)'
+        required: true
+        default: '120'
+
+jobs:
+  rdp:
+    name: Start Windows RDP Session
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Precompilar Spotlight Music
+        run: |
+          pip install pyinstaller -r requirements.txt
+          pyinstaller --noconfirm --onefile --windowed --name SpotlightMusic main.py
+          
+          # Crear carpeta en el Escritorio con la aplicación lista
+          $desktop = [Environment]::GetFolderPath('Desktop')
+          $appDir = Join-Path $desktop "SpotlightMusic"
+          New-Item -ItemType Directory -Path $appDir -Force
+          Copy-Item "dist\SpotlightMusic.exe" -Destination $appDir
+          Copy-Item "install_windows.bat" -Destination $appDir
+          Copy-Item "README.md" -Destination $appDir
+
+          # Crear acceso directo en el Escritorio
+          $WshShell = New-Object -ComObject WScript.Shell
+          $Shortcut = $WshShell.CreateShortcut(Join-Path $desktop "Spotlight Music.lnk")
+          $Shortcut.TargetPath = Join-Path $appDir "SpotlightMusic.exe"
+          $Shortcut.WorkingDirectory = $appDir
+          $Shortcut.Save()
+
+      - name: Activar Escritorio Remoto (RDP)
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 0
+          net user runneradmin "Spotlight2026!"
+
+      - name: Descargar e Iniciar Túnel Ngrok
+        env:
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+        run: |
+          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+          Expand-Archive ngrok.zip -DestinationPath .
+          .\ngrok.exe config add-authtoken $env:NGROK_AUTHTOKEN
+          Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp 3389"
+          Start-Sleep -Seconds 6
+
+          $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
+          $rdp_url = $response.tunnels[0].public_url
+          $clean_host = $rdp_url -replace "tcp://", ""
+
+          Write-Host ""
+          Write-Host "==========================================================" -ForegroundColor Green
+          Write-Host "🎉 ESCRITORIO REMOTO DE WINDOWS INICIADO CON ÉXITO!" -ForegroundColor Green
+          Write-Host "==========================================================" -ForegroundColor Green
+          Write-Host "Dirección RDP : $clean_host" -ForegroundColor Yellow
+          Write-Host "Usuario       : runneradmin" -ForegroundColor Yellow
+          Write-Host "Contraseña    : Spotlight2026!" -ForegroundColor Yellow
+          Write-Host "==========================================================" -ForegroundColor Green
+          Write-Host "Comando para conectar desde tu Linux:" -ForegroundColor Cyan
+          Write-Host "wlfreerdp /v:$clean_host /u:runneradmin /p:Spotlight2026! /cert:ignore" -ForegroundColor White
+          Write-Host "==========================================================" -ForegroundColor Green
+          Write-Host ""
+
+      - name: Mantener sesión RDP activa
+        run: |
+          $minutes = [int]"${{ github.event.inputs.duration_minutes }}"
+          if ($minutes -le 0) { $minutes = 120 }
+          $seconds = $minutes * 60
+          Write-Host "Sesión RDP activa durante $minutes minutos... Puedes cancelarla en cualquier momento desde GitHub."
+          Start-Sleep -Seconds $seconds
