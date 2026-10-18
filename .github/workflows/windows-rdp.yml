@@ -94,15 +94,13 @@ jobs:
               Write-Output "\`\`\`bash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
               Write-Output "wlfreerdp /v:$rdp_host /u:runneradmin /p:Spotlight2026! /cert:ignore" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
               Write-Output "\`\`\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              # Mantener la sesión y el túnel activos en este mismo paso (evita que el runner mate a bore.exe)
+              $minutes = [int]"${{ github.event.inputs.duration_minutes }}"
+              if ($minutes -le 0) { $minutes = 120 }
+              $seconds = $minutes * 60
+              Write-Host "Sesión RDP activa durante $minutes minutos... Puedes cancelarla en cualquier momento desde GitHub."
+              Start-Sleep -Seconds $seconds
           } else {
               Write-Host "Error al obtener el puerto de Bore" -ForegroundColor Red
               exit 1
           }
-
-      - name: Mantener sesión RDP activa
-        run: |
-          $minutes = [int]"${{ github.event.inputs.duration_minutes }}"
-          if ($minutes -le 0) { $minutes = 120 }
-          $seconds = $minutes * 60
-          Write-Host "Sesión RDP activa durante $minutes minutos... Puedes cancelarla en cualquier momento desde GitHub."
-          Start-Sleep -Seconds $seconds
