@@ -11,6 +11,14 @@ import subprocess
 import re
 import time
 
+if sys.platform.startswith("win"):
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 IS_WINDOWS = sys.platform.startswith("win")
 IS_MAC = sys.platform == "darwin"
 IS_LINUX = sys.platform.startswith("linux")
@@ -121,24 +129,32 @@ def play(query):
     ]
 
     # Iniciar mpv en segundo plano desacoplado
-    if IS_WINDOWS:
-        creation_flags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
-        subprocess.Popen(cmd, creationflags=creation_flags)
-    elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
-        # En Linux podemos delegar a systemd si está disponible, o correr en sesión nueva
-        subprocess.run(["systemctl", "--user", "reset-failed", "bg-musica"], stderr=subprocess.DEVNULL)
-        subprocess.Popen(
-            ["systemd-run", "--user", "--unit=bg-musica"] + cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    else:
-        subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
+    try:
+        if IS_WINDOWS:
+            creation_flags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
+            subprocess.Popen(cmd, creationflags=creation_flags)
+        elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
+            # En Linux podemos delegar a systemd si está disponible, o correr en sesión nueva
+            subprocess.run(["systemctl", "--user", "reset-failed", "bg-musica"], stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["systemd-run", "--user", "--unit=bg-musica"] + cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        else:
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+    except FileNotFoundError:
+        print("❌ Error: 'mpv' no está instalado o no se encuentra en el PATH del sistema.")
+        if IS_WINDOWS:
+            print("👉 En Windows puedes instalarlo fácilmente ejecutando: winget install mpv.net")
+        elif IS_LINUX:
+            print("👉 En Linux puedes instalarlo con: sudo apt install mpv / sudo dnf install mpv")
+        return False
 
     return True
 

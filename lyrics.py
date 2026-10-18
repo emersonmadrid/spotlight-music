@@ -186,7 +186,44 @@ def show_lyrics_window():
         win.show_all()
         Gtk.main()
     except Exception:
-        # Fallback a consola si no hay servidor gráfico GTK
+        # Fallback con Tkinter si GTK no está disponible (Windows / macOS)
+        try:
+            import tkinter as tk
+            from tkinter import scrolledtext
+
+            root = tk.Tk()
+            root.title(f"Letra: {track} - {artist}")
+            root.configure(bg="#121217")
+            root.attributes("-topmost", True)
+
+            w, h = 460, 560
+            sw = root.winfo_screenwidth()
+            sh = root.winfo_screenheight()
+            x = (sw - w) // 2
+            y = (sh - h) // 2
+            root.geometry(f"{w}x{h}+{x}+{y}")
+
+            lbl_t = tk.Label(root, text=track or "Canción desconocida", bg="#121217", fg="#ffffff", font=("Segoe UI", 13, "bold"), anchor="w")
+            lbl_t.pack(fill=tk.X, padx=20, pady=(16, 2))
+
+            lbl_a = tk.Label(root, text=artist or "Artista desconocido", bg="#121217", fg="#9ba1b5", font=("Segoe UI", 10), anchor="w")
+            lbl_a.pack(fill=tk.X, padx=20, pady=(0, 10))
+
+            txt = scrolledtext.ScrolledText(root, bg="#181820", fg="#dcdfe8", font=("Segoe UI", 11), bd=0, padx=12, pady=12)
+            txt.insert(tk.END, lyrics)
+            txt.configure(state=tk.DISABLED)
+            txt.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 10))
+
+            lbl_h = tk.Label(root, text="Presiona Esc para cerrar", bg="#121217", fg="#5d6175", font=("Segoe UI", 9))
+            lbl_h.pack(pady=(0, 10))
+
+            root.bind("<Escape>", lambda e: root.destroy())
+            root.mainloop()
+            return
+        except Exception:
+            pass
+
+        # Fallback final a consola
         print(f"\n🎵 {track} - {artist}\n{'=' * 40}")
         print(lyrics)
         print("=" * 40 + "\n")

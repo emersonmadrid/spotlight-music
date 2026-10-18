@@ -10,6 +10,34 @@ import threading
 import subprocess
 import time
 
+# Configuración para Windows: Conexión híbrida con consola y codificación UTF-8
+if sys.platform == "win32":
+    try:
+        import ctypes
+        # Si se ejecutó desde CMD o PowerShell, adjuntar la salida a dicha terminal
+        if ctypes.windll.kernel32.AttachConsole(-1):
+            sys.stdout = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+            sys.stderr = open("CONOUT$", "w", encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+if sys.stdout is None:
+    class DummyStream:
+        def write(self, *args, **kwargs): pass
+        def flush(self, *args, **kwargs): pass
+        def reconfigure(self, *args, **kwargs): pass
+    sys.stdout = DummyStream()
+
+if sys.stderr is None:
+    sys.stderr = sys.stdout
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import player
 import lyrics
 
@@ -21,8 +49,9 @@ def show_spotlight_player(initial_query=""):
         gi.require_version('Gtk', '3.0')
         gi.require_version('Gdk', '3.0')
         from gi.repository import Gtk, Gdk, GLib
-    except ImportError:
-        print("GTK3 no está disponible en este entorno. Usa la interfaz de consola: python main.py play <canción>")
+    except (ImportError, ValueError):
+        # Fallback universal nativo (Windows, macOS o Linux sin GTK3)
+        show_spotlight_tkinter(initial_query)
         return
 
     win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
@@ -267,6 +296,90 @@ def show_spotlight_player(initial_query=""):
     Gtk.main()
 
 
+def show_spotlight_tkinter(initial_query=""):
+    """Lanza la ventana flotante Spotlight / Raycast usando Tkinter (nativo en Windows y macOS)."""
+    try:
+        import tkinter as tk
+    except ImportError:
+        print("Interfaz gráfica no disponible. Usa la consola: python main.py play <canción>")
+        return
+
+    root = tk.Tk()
+    root.title("Spotlight Music")
+    root.configure(bg="#121217")
+    root.attributes("-topmost", True)
+
+    w, h = 520, 180
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
+    x = (sw - w) // 2
+    y = (sh - h) // 2
+    root.geometry(f"{w}x{h}+{x}+{y}")
+    root.resizable(False, False)
+
+    frame = tk.Frame(root, bg="#121217", padx=20, pady=16)
+    frame.pack(fill=tk.BOTH, expand=True)
+
+    title, paused, activo = player.get_status()
+    header_text = f"🎵 {title[:40]}..." if (activo and title) else "🎵 Spotlight Music"
+    if paused:
+        header_text += " (Pausado)"
+
+    lbl_status = tk.Label(frame, text=header_text, bg="#121217", fg="#ffffff", font=("Segoe UI", 11, "bold"), anchor="w")
+    lbl_status.pack(fill=tk.X, pady=(0, 10))
+
+    ctrl_frame = tk.Frame(frame, bg="#121217")
+    ctrl_frame.pack(fill=tk.X, pady=(0, 12))
+
+    def do_pause():
+        player.pause()
+        t, p, a = player.get_status()
+        lbl_status.config(text=(f"🎵 {t[:40]}..." if t else "🎵 Spotlight Music") + (" (Pausado)" if p else ""))
+
+    def do_next():
+        player.next_track()
+
+    def do_prev():
+        player.prev_track()
+
+    def do_lyrics():
+        threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start()
+
+    def do_fav():
+        ok, msg = player.save_favorite()
+        lbl_status.config(text=f"⭐ {msg}")
+
+    btn_style = {"bg": "#22232e", "fg": "#c5c8d6", "activebackground": "#303242", "activeforeground": "#ffffff", "bd": 0, "padx": 10, "pady": 4, "font": ("Segoe UI", 9, "bold"), "cursor": "hand2"}
+
+    tk.Button(ctrl_frame, text="⏮ Prev", command=do_prev, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+    tk.Button(ctrl_frame, text="⏯ Pausa", command=do_pause, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+    tk.Button(ctrl_frame, text="⏭ Next", command=do_next, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+    tk.Button(ctrl_frame, text="❤️ Fav", command=do_fav, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+    tk.Button(ctrl_frame, text="🎤 Letra", command=do_lyrics, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+
+    entry = tk.Entry(frame, bg="#1c1d26", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 12), bd=0, highlightthickness=1, highlightbackground="#353748", highlightcolor="#6366f1")
+    entry.pack(fill=tk.X, pady=(0, 8), ipady=6)
+    if initial_query:
+        entry.insert(0, initial_query)
+    entry.focus_set()
+
+    lbl_info = tk.Label(frame, text="Escribe una canción o artista y presiona Enter • Esc para cerrar", bg="#121217", fg="#7a7f98", font=("Segoe UI", 9))
+    lbl_info.pack(fill=tk.X)
+
+    def on_enter(event=None):
+        q = entry.get().strip()
+        if q:
+            lbl_info.config(text=f"🔍 Reproduciendo: '{q}'...")
+            root.update()
+            player.play(q)
+            root.after(1000, root.destroy)
+
+    entry.bind("<Return>", on_enter)
+    root.bind("<Escape>", lambda e: root.destroy())
+
+    root.mainloop()
+
+
 def run_tray():
     """Ejecuta el icono en la barra de tareas."""
     if sys.platform.startswith("linux"):
@@ -332,11 +445,49 @@ def run_tray():
             GLib.timeout_add_seconds(2, update_menu)
             Gtk.main()
             return
-        except Exception as e:
-            print("No se pudo iniciar el AppIndicator en Linux, pasando a consola:", e)
+        except Exception:
+            pass
 
-    # Si estamos en Windows o no hay GTK disponible
-    print("Iniciando reproductor de música en segundo plano...")
+    # Soporte para Windows / macOS mediante pystray
+    try:
+        import pystray
+        from PIL import Image, ImageDraw
+
+        def create_tray_image():
+            img = Image.new('RGB', (64, 64), color=(18, 18, 23))
+            d = ImageDraw.Draw(img)
+            d.ellipse((10, 10, 54, 54), fill=(99, 102, 241))
+            return img
+
+        def on_open(icon, item):
+            threading.Thread(target=show_spotlight_player, daemon=True).start()
+
+        def on_pause(icon, item):
+            player.pause()
+
+        def on_next(icon, item):
+            player.next_track()
+
+        def on_lyrics(icon, item):
+            threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start()
+
+        def on_exit(icon, item):
+            icon.stop()
+
+        tray_menu = pystray.Menu(
+            pystray.MenuItem("🔍 Buscar música", on_open, default=True),
+            pystray.MenuItem("⏯️ Pausar / Reanudar", on_pause),
+            pystray.MenuItem("⏭️ Siguiente", on_next),
+            pystray.MenuItem("🎤 Ver letra", on_lyrics),
+            pystray.MenuItem("❌ Salir", on_exit)
+        )
+        icon = pystray.Icon("SpotlightMusic", create_tray_image(), "Spotlight Music", tray_menu)
+        icon.run()
+        return
+    except Exception:
+        pass
+
+    # Si no hay bandeja gráfica disponible, abrir ventana Spotlight
     show_spotlight_player()
 
 
