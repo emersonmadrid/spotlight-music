@@ -1,0 +1,26 @@
+name: Windows Interactive Shell (tmate)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  interactive:
+    name: Interactive Windows Terminal
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias y precompilar
+        run: |
+          pip install pyinstaller -r requirements.txt
+          pyinstaller --noconfirm --onefile --windowed --name SpotlightMusic main.py
+          dir dist
+
+      - name: Iniciar consola interactiva tmate
+        uses: mxschmitt/action-tmate@v3
