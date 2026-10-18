@@ -83,15 +83,15 @@ jobs:
               Write-Host "==========================================================" -ForegroundColor Green
               
               # Guardar en el Summary de GitHub para verlo en la web
-              "### 🖥️ Datos de Conexión a la Máquina Windows" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "- **Servidor RDP:** \`$rdp_host\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "- **Usuario:** \`runneradmin\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "- **Contraseña:** \`Spotlight2026!\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "**Comando para tu terminal de Linux:**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "\`\`\`bash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "wlfreerdp /v:$rdp_host /u:runneradmin /p:Spotlight2026! /cert:ignore" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
-              "\`\`\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "### 🖥️ Datos de Conexión a la Máquina Windows" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "- **Servidor RDP:** \`$rdp_host\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "- **Usuario:** \`runneradmin\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "- **Contraseña:** \`Spotlight2026!\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "**Comando para tu terminal de Linux:**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "\`\`\`bash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "wlfreerdp /v:$rdp_host /u:runneradmin /p:Spotlight2026! /cert:ignore" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              Write-Output "\`\`\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
           } else {
               Write-Host "Error al obtener el puerto de Bore" -ForegroundColor Red
               exit 1
