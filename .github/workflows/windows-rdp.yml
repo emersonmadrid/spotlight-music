@@ -53,32 +53,49 @@ jobs:
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -value 0
           net user runneradmin "Spotlight2026!"
 
-      - name: Descargar e Iniciar Túnel Ngrok
-        env:
-          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+      - name: Iniciar Túnel Bore (Puerto 3389 RDP)
         run: |
-          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
-          Expand-Archive ngrok.zip -DestinationPath .
-          .\ngrok.exe config add-authtoken $env:NGROK_AUTHTOKEN
-          Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp 3389"
-          Start-Sleep -Seconds 6
-
-          $response = Invoke-RestMethod http://127.0.0.1:4040/api/tunnels
-          $rdp_url = $response.tunnels[0].public_url
-          $clean_host = $rdp_url -replace "tcp://", ""
-
-          Write-Host ""
-          Write-Host "==========================================================" -ForegroundColor Green
-          Write-Host "🎉 ESCRITORIO REMOTO DE WINDOWS INICIADO CON ÉXITO!" -ForegroundColor Green
-          Write-Host "==========================================================" -ForegroundColor Green
-          Write-Host "Dirección RDP : $clean_host" -ForegroundColor Yellow
-          Write-Host "Usuario       : runneradmin" -ForegroundColor Yellow
-          Write-Host "Contraseña    : Spotlight2026!" -ForegroundColor Yellow
-          Write-Host "==========================================================" -ForegroundColor Green
-          Write-Host "Comando para conectar desde tu Linux:" -ForegroundColor Cyan
-          Write-Host "wlfreerdp /v:$clean_host /u:runneradmin /p:Spotlight2026! /cert:ignore" -ForegroundColor White
-          Write-Host "==========================================================" -ForegroundColor Green
-          Write-Host ""
+          Invoke-WebRequest https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-pc-windows-msvc.zip -OutFile bore.zip
+          Expand-Archive bore.zip -DestinationPath .
+          
+          # Iniciar bore en segundo plano redirigiendo logs
+          $proc = Start-Process -FilePath ".\bore.exe" -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore.log" -RedirectStandardError "bore.err" -PassThru
+          Start-Sleep -Seconds 5
+          
+          $log = Get-Content bore.log -Raw
+          Write-Host "Log de Bore:"
+          Write-Host $log
+          
+          if ($log -match 'remote_port=(\d+)') {
+              $port = $matches[1]
+              $rdp_host = "bore.pub:$port"
+              
+              Write-Host ""
+              Write-Host "==========================================================" -ForegroundColor Green
+              Write-Host "🎉 ESCRITORIO REMOTO DE WINDOWS INICIADO CON ÉXITO!" -ForegroundColor Green
+              Write-Host "==========================================================" -ForegroundColor Green
+              Write-Host "Dirección RDP : $rdp_host" -ForegroundColor Yellow
+              Write-Host "Usuario       : runneradmin" -ForegroundColor Yellow
+              Write-Host "Contraseña    : Spotlight2026!" -ForegroundColor Yellow
+              Write-Host "==========================================================" -ForegroundColor Green
+              Write-Host "Comando para conectar desde tu Linux:" -ForegroundColor Cyan
+              Write-Host "wlfreerdp /v:$rdp_host /u:runneradmin /p:Spotlight2026! /cert:ignore" -ForegroundColor White
+              Write-Host "==========================================================" -ForegroundColor Green
+              
+              # Guardar en el Summary de GitHub para verlo en la web
+              "### 🖥️ Datos de Conexión a la Máquina Windows" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "- **Servidor RDP:** \`$rdp_host\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "- **Usuario:** \`runneradmin\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "- **Contraseña:** \`Spotlight2026!\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "**Comando para tu terminal de Linux:**" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "\`\`\`bash" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "wlfreerdp /v:$rdp_host /u:runneradmin /p:Spotlight2026! /cert:ignore" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+              "\`\`\`" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          } else {
+              Write-Host "Error al obtener el puerto de Bore" -ForegroundColor Red
+              exit 1
+          }
 
       - name: Mantener sesión RDP activa
         run: |
