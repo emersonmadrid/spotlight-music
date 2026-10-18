@@ -27,41 +27,43 @@ Solo necesitas tener instalados en tu sistema:
 
 ---
 
-## 🐧 Instalación en Linux
+## 📦 Instalación Rápida (1 Solo Comando)
 
-### Fedora / RHEL
+### 🐧 En Linux (Fedora, Ubuntu, Debian, Arch)
+Clona y corre el instalador automático:
 ```bash
-sudo dnf install mpv yt-dlp python3-gobject gtk3
+git clone https://github.com/emersonmadrid/spotlight-music.git
+cd spotlight-music
+./install.sh
 ```
+*Instala las dependencias necesarias, crea el comando `spotlight-music` en tu sistema y agrega el acceso directo.*
 
-### Ubuntu / Debian / Pop!_OS
-```bash
-sudo apt install mpv yt-dlp python3-gi python3-gi-cairo gir1.2-gtk-3.0
-```
+---
 
-### Arch Linux / Manjaro
+### 🪟 En Windows (1 Clic)
+1. Descarga el repositorio o clónalo con:
+   ```cmd
+   git clone https://github.com/emersonmadrid/spotlight-music.git
+   cd spotlight-music
+   ```
+2. Haz **doble clic en `install_windows.bat`**.
+*El instalador instalará las librerías, verificará `mpv` y `yt-dlp`, y creará un acceso directo en tu Escritorio.*
+
+---
+
+### 🍏 En macOS (Mac)
 ```bash
-sudo pacman -S mpv yt-dlp python-gobject gtk3
+git clone https://github.com/emersonmadrid/spotlight-music.git
+cd spotlight-music
+./install_mac.sh
 ```
 
 ---
 
-## 🪟 Instalación en Windows
-
-1. Clona o descarga esta carpeta.
-2. Descarga `mpv` y `yt-dlp` (o instálalos con `winget`):
-   ```cmd
-   winget install mpv.net
-   winget install yt-dlp
-   ```
-3. Instala los requisitos de Python:
-   ```cmd
-   pip install -r requirements.txt
-   ```
-4. Ejecuta:
-   ```cmd
-   python main.py
-   ```
+### 🐍 O instalación universal con Python (Cualquier Sistema)
+```bash
+pip install .
+```
 
 ---
 

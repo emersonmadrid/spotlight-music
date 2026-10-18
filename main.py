@@ -357,7 +357,7 @@ Uso:
     """)
 
 
-if __name__ == "__main__":
+def main():
     args = sys.argv[1:]
     if not args:
         run_tray()
@@ -383,6 +383,12 @@ if __name__ == "__main__":
     elif args[0] in ("like", "fav"):
         ok, msg = player.save_favorite()
         print(msg)
+    elif args[0] in ("help", "--help", "-h"):
+        print_help()
     else:
         # Por defecto reproducir lo que se escriba
         player.play(" ".join(args))
+
+
+if __name__ == "__main__":
+    main()
