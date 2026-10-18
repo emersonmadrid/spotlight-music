@@ -1,0 +1,116 @@
+name: Build and Release Executables
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: SpotlightMusic-Windows-x64.zip
+            asset_name: SpotlightMusic-Windows-x64
+          - os: ubuntu-latest
+            artifact_name: SpotlightMusic-Linux-x64.tar.gz
+            asset_name: SpotlightMusic-Linux-x64
+          - os: macos-latest
+            artifact_name: SpotlightMusic-macOS-x64.tar.gz
+            asset_name: SpotlightMusic-macOS-x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libgirepository1.0-dev gir1.2-gtk-3.0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller -r requirements.txt
+
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name SpotlightMusic main.py
+          Compress-Archive -Path dist\SpotlightMusic.exe, install_windows.bat, README.md, LICENSE, DISCLAIMER.md -DestinationPath SpotlightMusic-Windows-x64.zip
+
+      - name: Build with PyInstaller (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pyinstaller --noconfirm --onefile --name spotlight-music main.py
+          tar -czf SpotlightMusic-Linux-x64.tar.gz -C dist spotlight-music
+
+      - name: Build with PyInstaller (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --noconfirm --onefile --name spotlight-music main.py
+          tar -czf SpotlightMusic-macOS-x64.tar.gz -C dist spotlight-music
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.artifact_name }}
+
+  release:
+    name: Publish Release with Assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish Release on Tag
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          draft: false
+          prerelease: false
+
+      - name: Update Rolling Release on Main
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rolling
+          name: "Spotlight Music - Última Versión Compilada (Rolling)"
+          body: |
+            ## 🎵 Descarga directa de ejecutables actualizados automáticamente
+
+            Cada vez que el código se modifica, GitHub compila y publica automáticamente estos ejecutables oficiales:
+
+            * 🪟 **Windows:** [SpotlightMusic-Windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-Windows-x64.zip) *(Descomprimir y dar doble clic)*
+            * 🐧 **Linux:** [SpotlightMusic-Linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-Linux-x64.tar.gz)
+            * 🍏 **macOS:** [SpotlightMusic-macOS-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-macOS-x64.tar.gz)
+
+            ---
+            *Compilación automática generada por GitHub Actions para el commit `${{ github.sha }}`.*
+          files: release-assets/*
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
