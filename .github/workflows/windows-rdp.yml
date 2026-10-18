@@ -62,11 +62,13 @@ jobs:
           $proc = Start-Process -FilePath ".\bore.exe" -ArgumentList "local 3389 --to bore.pub" -RedirectStandardOutput "bore.log" -RedirectStandardError "bore.err" -PassThru
           Start-Sleep -Seconds 5
           
-          $log = Get-Content bore.log -Raw
+          $rawLog = Get-Content bore.log -Raw
           Write-Host "Log de Bore:"
-          Write-Host $log
+          Write-Host $rawLog
           
-          if ($log -match 'remote_port=(\d+)') {
+          # Limpiar secuencias de escape ANSI de colores
+          $cleanLog = $rawLog -replace '\x1b\[[0-9;]*[a-zA-Z]', ''
+          if ($cleanLog -match 'bore\.pub:(\d+)') {
               $port = $matches[1]
               $rdp_host = "bore.pub:$port"
               
