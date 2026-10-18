@@ -36,10 +36,15 @@ jobs:
 
           # Crear acceso directo en el Escritorio
           $WshShell = New-Object -ComObject WScript.Shell
-          $Shortcut = $WshShell.CreateShortcut(Join-Path $desktop "Spotlight Music.lnk")
-          $Shortcut.TargetPath = Join-Path $appDir "SpotlightMusic.exe"
+          $shortcutPath = Join-Path $desktop "Spotlight Music.lnk"
+          $Shortcut = $WshShell.CreateShortcut($shortcutPath)
+          $exePath = Join-Path $appDir "SpotlightMusic.exe"
+          $Shortcut.TargetPath = $exePath
           $Shortcut.WorkingDirectory = $appDir
           $Shortcut.Save()
+
+          # Instalar mpv para que la reproducción de audio esté lista
+          winget install --id shinchiro.mpv --silent --accept-source-agreements --accept-package-agreements 2>$null
 
       - name: Activar Escritorio Remoto (RDP)
         run: |
