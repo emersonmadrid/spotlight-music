@@ -51,7 +51,17 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           pyinstaller --noconfirm --onefile --windowed --name SpotlightMusic main.py
-          Compress-Archive -Path dist\SpotlightMusic.exe, install_windows.bat, README.md, LICENSE, DISCLAIMER.md -DestinationPath SpotlightMusic-Windows-x64.zip
+          
+          # Descargar motor de audio mpv portable para Windows
+          curl.exe -sL https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261019/mpv-x86_64-20261019-git-6a262d11f6.7z -o mpv.7z
+          7z e mpv.7z mpv.exe -odist -y
+          Remove-Item mpv.7z -ErrorAction SilentlyContinue
+
+          # Descargar extractor yt-dlp.exe para Windows
+          curl.exe -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o dist\yt-dlp.exe
+
+          # Empaquetar todo junto (Zero dependencies, 100% portable)
+          Compress-Archive -Path dist\SpotlightMusic.exe, dist\mpv.exe, dist\yt-dlp.exe, install_windows.bat, README.md, LICENSE, DISCLAIMER.md -DestinationPath SpotlightMusic-Windows-x64.zip
 
       - name: Build with PyInstaller (Linux)
         if: runner.os == 'Linux'

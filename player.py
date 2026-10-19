@@ -91,6 +91,20 @@ def get_status():
     return title, paused, activo
 
 
+def get_mpv_path():
+    """Localiza el binario de mpv: primero en la carpeta de la app, luego en PATH."""
+    app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
+    if IS_WINDOWS:
+        candidate = os.path.join(app_dir, "mpv.exe")
+        if os.path.exists(candidate):
+            return candidate
+    else:
+        candidate = os.path.join(app_dir, "mpv")
+        if os.path.exists(candidate):
+            return candidate
+    return "mpv"
+
+
 def play(query):
     """Inicia la reproducción de una consulta o enlace."""
     if not query:
@@ -118,8 +132,9 @@ def play(query):
     else:
         target = f"ytdl://ytsearch25:{query} audio"
 
+    mpv_bin = get_mpv_path()
     cmd = [
-        "mpv",
+        mpv_bin,
         "--no-video",
         "--volume=85",
         "--af=dynaudnorm",
@@ -128,25 +143,32 @@ def play(query):
         target
     ]
 
+    # Preparar entorno asegurando que yt-dlp local sea visible
+    app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
+    env = os.environ.copy()
+    env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
+
     # Iniciar mpv en segundo plano desacoplado
     try:
         if IS_WINDOWS:
             creation_flags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
-            subprocess.Popen(cmd, creationflags=creation_flags)
+            subprocess.Popen(cmd, creationflags=creation_flags, env=env)
         elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
             # En Linux podemos delegar a systemd si está disponible, o correr en sesión nueva
             subprocess.run(["systemctl", "--user", "reset-failed", "bg-musica"], stderr=subprocess.DEVNULL)
             subprocess.Popen(
                 ["systemd-run", "--user", "--unit=bg-musica"] + cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
+                env=env
             )
         else:
             subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                start_new_session=True
+                start_new_session=True,
+                env=env
             )
     except FileNotFoundError:
         print("❌ Error: 'mpv' no está instalado o no se encuentra en el PATH del sistema.")

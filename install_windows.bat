@@ -26,6 +26,12 @@ echo [1/3] Instalando dependencias de Python...
 pip install -r requirements.txt
 
 :check_mpv
+REM Si mpv.exe ya viene empaquetado en la carpeta portable, no requiere instalar nada
+if exist "%~dp0mpv.exe" (
+    echo [OK] Motor de audio 'mpv.exe' portable detectado en el paquete.
+    goto create_shortcut
+)
+
 echo.
 echo [2/3] Verificando motor de reproducción de audio (mpv)...
 where mpv >nul 2>nul
@@ -33,9 +39,10 @@ if %errorlevel% neq 0 (
     echo Instalando mpv mediante winget (gestor oficial de Windows)...
     winget install --id shinchiro.mpv --silent --accept-source-agreements --accept-package-agreements 2>nul || winget install mpv.net 2>nul
 ) else (
-    echo [OK] mpv ya está instalado.
+    echo [OK] mpv ya está instalado en el sistema.
 )
 
+:create_shortcut
 echo.
 echo [3/3] Creando acceso directo en el Escritorio...
 if exist "%~dp0SpotlightMusic.exe" (

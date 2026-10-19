@@ -375,13 +375,41 @@ def show_spotlight_tkinter(initial_query=""):
     def on_enter(event=None):
         q = entry.get().strip()
         if q:
-            lbl_info.config(text=f"🔍 Reproduciendo: '{q}'...")
+            lbl_info.config(text="🔍 Conectando con YouTube Music...", fg="#818cf8")
+            lbl_status.config(text=f"⏳ Buscando: {q}...")
             root.update()
-            player.play(q)
-            root.after(1000, root.destroy)
+
+            def start_bg():
+                ok = player.play(q)
+                if not ok:
+                    lbl_status.config(text="❌ Error al iniciar reproductor")
+                    lbl_info.config(text="Verifica tu conexión o los componentes de audio", fg="#ef4444")
+                    return
+                for _ in range(25):
+                    time.sleep(0.5)
+                    t, p, a = player.get_status()
+                    if a and t and player.es_titulo_valido(t):
+                        lbl_status.config(text=f"🎵 {t[:38]}...")
+                        lbl_info.config(text="▶️ Reproduciendo ahora • Esc para cerrar", fg="#34d399")
+                        break
+
+            threading.Thread(target=start_bg, daemon=True).start()
+
+    def auto_refresh():
+        try:
+            t, p, a = player.get_status()
+            if a and t and player.es_titulo_valido(t):
+                text = f"🎵 {t[:38]}..."
+                if p:
+                    text += " (Pausado)"
+                lbl_status.config(text=text)
+            root.after(2000, auto_refresh)
+        except Exception:
+            pass
 
     entry.bind("<Return>", on_enter)
     root.bind("<Escape>", lambda e: root.destroy())
+    root.after(2000, auto_refresh)
 
     root.mainloop()
 
