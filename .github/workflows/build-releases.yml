@@ -60,8 +60,11 @@ jobs:
           # Descargar extractor yt-dlp.exe para Windows
           curl.exe -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o dist\yt-dlp.exe
 
+          # Incluir vulkan-1.dll para compatibilidad con máquinas virtuales y Windows sin drivers dedicados
+          Copy-Item bin\windows\vulkan-1.dll -Destination dist\vulkan-1.dll
+
           # Empaquetar todo junto (Zero dependencies, 100% portable)
-          Compress-Archive -Path dist\SpotlightMusic.exe, dist\mpv.exe, dist\yt-dlp.exe, install_windows.bat, README.md, LICENSE, DISCLAIMER.md -DestinationPath SpotlightMusic-Windows-x64.zip
+          Compress-Archive -Path dist\SpotlightMusic.exe, dist\mpv.exe, dist\yt-dlp.exe, dist\vulkan-1.dll, install_windows.bat, README.md, LICENSE, DISCLAIMER.md -DestinationPath SpotlightMusic-Windows-x64.zip
 
       - name: Build with PyInstaller (Linux)
         if: runner.os == 'Linux'
