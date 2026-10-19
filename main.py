@@ -357,8 +357,32 @@ def show_spotlight_tkinter(initial_query=""):
 
     btn_style = {"bg": "#22232e", "fg": "#c5c8d6", "activebackground": "#303242", "activeforeground": "#ffffff", "bd": 0, "padx": 10, "pady": 4, "font": ("Segoe UI", 9, "bold"), "cursor": "hand2"}
 
+    def do_pause():
+        player.pause()
+        t, p, a = player.get_status()
+        cur, dur = player.get_playback_time()
+        time_str = f" [{cur} / {dur}]" if cur else ""
+        lbl_status.config(text=(f"🎵 {t[:35]}...{time_str}" if t else "🎵 Spotlight Music") + (" (Pausado)" if p else ""))
+        btn_pause.config(text="▶ Play" if p else "⏸ Pausa")
+
+    def do_next():
+        player.next_track()
+        lbl_status.config(text="⏳ Pasando a siguiente...")
+
+    def do_prev():
+        player.prev_track()
+        lbl_status.config(text="⏳ Volviendo a anterior...")
+
+    def do_lyrics():
+        threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start()
+
+    def do_fav():
+        ok, msg = player.save_favorite()
+        lbl_status.config(text=f"⭐ {msg}")
+
     tk.Button(ctrl_frame, text="⏮ Prev", command=do_prev, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
-    tk.Button(ctrl_frame, text="⏯ Pausa", command=do_pause, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+    btn_pause = tk.Button(ctrl_frame, text="⏸ Pausa", command=do_pause, **btn_style)
+    btn_pause.pack(side=tk.LEFT, padx=(0, 6))
     tk.Button(ctrl_frame, text="⏭ Next", command=do_next, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
     tk.Button(ctrl_frame, text="❤️ Fav", command=do_fav, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
     tk.Button(ctrl_frame, text="🎤 Letra", command=do_lyrics, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
@@ -375,6 +399,7 @@ def show_spotlight_tkinter(initial_query=""):
     def on_enter(event=None):
         q = entry.get().strip()
         if q:
+            entry.delete(0, tk.END)
             lbl_info.config(text="🔍 Conectando con YouTube Music...", fg="#818cf8")
             lbl_status.config(text=f"⏳ Buscando: {q}...")
             root.update()
@@ -389,8 +414,10 @@ def show_spotlight_tkinter(initial_query=""):
                     time.sleep(0.5)
                     t, p, a = player.get_status()
                     if a and t and player.es_titulo_valido(t):
-                        lbl_status.config(text=f"🎵 {t[:38]}...")
-                        lbl_info.config(text="▶️ Reproduciendo ahora • Esc para cerrar", fg="#34d399")
+                        cur, dur = player.get_playback_time()
+                        time_str = f" [{cur} / {dur}]" if cur else ""
+                        lbl_status.config(text=f"🎵 {t[:35]}...{time_str}")
+                        lbl_info.config(text="▶ Reproduciendo ahora • Esc para cerrar", fg="#34d399")
                         break
 
             threading.Thread(target=start_bg, daemon=True).start()
@@ -399,17 +426,20 @@ def show_spotlight_tkinter(initial_query=""):
         try:
             t, p, a = player.get_status()
             if a and t and player.es_titulo_valido(t):
-                text = f"🎵 {t[:38]}..."
+                cur, dur = player.get_playback_time()
+                time_str = f" [{cur} / {dur}]" if cur else ""
+                text = f"🎵 {t[:35]}...{time_str}"
                 if p:
                     text += " (Pausado)"
                 lbl_status.config(text=text)
-            root.after(2000, auto_refresh)
+                btn_pause.config(text="▶ Play" if p else "⏸ Pausa")
+            root.after(1000, auto_refresh)
         except Exception:
             pass
 
     entry.bind("<Return>", on_enter)
     root.bind("<Escape>", lambda e: root.destroy())
-    root.after(2000, auto_refresh)
+    root.after(1000, auto_refresh)
 
     root.mainloop()
 

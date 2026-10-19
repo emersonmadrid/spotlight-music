@@ -91,6 +91,20 @@ def get_status():
     return title, paused, activo
 
 
+def get_playback_time():
+    """Devuelve (tiempo_actual_formateado, duracion_formateada)."""
+    pos = get_property("time-pos")
+    dur = get_property("duration")
+    if pos is not None and dur is not None:
+        m_pos, s_pos = divmod(int(pos), 60)
+        m_dur, s_dur = divmod(int(dur), 60)
+        return f"{m_pos:02d}:{s_pos:02d}", f"{m_dur:02d}:{s_dur:02d}"
+    elif pos is not None:
+        m_pos, s_pos = divmod(int(pos), 60)
+        return f"{m_pos:02d}:{s_pos:02d}", "--:--"
+    return None, None
+
+
 def get_mpv_path():
     """Localiza el binario de mpv: primero en la carpeta de la app, luego en PATH."""
     app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
@@ -133,13 +147,16 @@ def play(query):
         target = f"ytdl://ytsearch25:{query} audio"
 
     mpv_bin = get_mpv_path()
+    log_file = os.path.join(os.environ.get("TEMP", os.environ.get("TMP", ".")), "spotlight_mpv.log") if IS_WINDOWS else "/tmp/spotlight_mpv.log"
     cmd = [
         mpv_bin,
         "--no-video",
-        "--volume=85",
-        "--af=dynaudnorm",
+        "--volume=100",
+        "--audio-exclusive=no",
+        "--ao=wasapi,openal,",
         "--ytdl-raw-options=yes-playlist=,playlist-end=30",
         f"--input-ipc-server={SOCKET_PATH}",
+        f"--log-file={log_file}",
         target
     ]
 
@@ -152,12 +169,20 @@ def play(query):
     try:
         if IS_WINDOWS:
             creation_flags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
-            subprocess.Popen(cmd, creationflags=creation_flags, env=env)
+            subprocess.Popen(
+                cmd,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creation_flags,
+                env=env
+            )
         elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
             # En Linux podemos delegar a systemd si está disponible, o correr en sesión nueva
             subprocess.run(["systemctl", "--user", "reset-failed", "bg-musica"], stderr=subprocess.DEVNULL)
             subprocess.Popen(
                 ["systemd-run", "--user", "--unit=bg-musica"] + cmd,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 env=env
@@ -165,6 +190,7 @@ def play(query):
         else:
             subprocess.Popen(
                 cmd,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
