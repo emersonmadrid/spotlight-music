@@ -106,6 +106,48 @@ def get_playback_time():
     return None, None
 
 
+def seek_percent(percent):
+    """Avanza la música al porcentaje indicado (0.0 a 100.0)."""
+    try:
+        pct = max(0.0, min(100.0, float(percent)))
+        return send_mpv_command(["seek", pct, "absolute-percent"])
+    except Exception:
+        return None
+
+
+def seek(seconds):
+    """Avanza la música a los segundos exactos indicados."""
+    try:
+        sec = max(0.0, float(seconds))
+        return send_mpv_command(["seek", sec, "absolute"])
+    except Exception:
+        return None
+
+
+def seek_relative(seconds):
+    """Avanza (+) o retrocede (-) N segundos."""
+    try:
+        return send_mpv_command(["seek", float(seconds), "relative"])
+    except Exception:
+        return None
+
+
+def get_progress():
+    """Devuelve (pos_segundos, dur_segundos, porcentaje_0_a_100, pos_str, dur_str)."""
+    pos = get_property("time-pos")
+    dur = get_property("duration")
+    pct = get_property("percent-pos")
+    if pos is not None and dur is not None and dur > 0:
+        percent = (pos / dur) * 100.0 if pct is None else float(pct)
+        m_pos, s_pos = divmod(int(pos), 60)
+        m_dur, s_dur = divmod(int(dur), 60)
+        return float(pos), float(dur), float(percent), f"{m_pos:02d}:{s_pos:02d}", f"{m_dur:02d}:{s_dur:02d}"
+    elif pos is not None:
+        m_pos, s_pos = divmod(int(pos), 60)
+        return float(pos), None, 0.0, f"{m_pos:02d}:{s_pos:02d}", "--:--"
+    return 0.0, 0.0, 0.0, "00:00", "00:00"
+
+
 def get_mpv_path():
     """Localiza el binario de mpv: subcarpetas internas engine/ o bin/, carpeta raíz, o en PATH."""
     app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))

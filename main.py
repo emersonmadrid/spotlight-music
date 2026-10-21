@@ -321,6 +321,83 @@ def show_spotlight_player(initial_query="", start_hidden=False):
     Gtk.main()
 
 
+class SeekBarWidget:
+    """Widget de barra de progreso y avance suave (Seek bar) con Tkinter Canvas."""
+    def __init__(self, parent, on_seek_callback=None, bg="#181922"):
+        import tkinter as tk
+        self.tk = tk
+        self.canvas = tk.Canvas(parent, height=12, bg=bg, highlightthickness=0, cursor="hand2")
+        self.on_seek = on_seek_callback
+        self.progress = 0.0  # 0.0 a 100.0
+        self.is_dragging = False
+        self.canvas.bind("<Configure>", self._on_configure)
+        self.canvas.bind("<Button-1>", self._on_click)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+
+    def pack(self, **kwargs):
+        self.canvas.pack(**kwargs)
+
+    def set_progress(self, percent):
+        if not self.is_dragging:
+            self.progress = max(0.0, min(100.0, float(percent)))
+            self._draw()
+
+    def _on_configure(self, event):
+        self._draw()
+
+    def _draw(self):
+        self.canvas.delete("all")
+        w = self.canvas.winfo_width()
+        h = self.canvas.winfo_height()
+        if w <= 1:
+            return
+
+        y_mid = h // 2
+        rail_h = 4
+        # Riel de fondo
+        self.canvas.create_line(4, y_mid, w - 4, y_mid, fill="#2c2e3e", width=rail_h, capstyle=self.tk.ROUND)
+
+        # Progreso activo
+        eff_w = max(1, w - 8)
+        pos_x = 4 + (self.progress / 100.0) * eff_w
+        if self.progress > 0:
+            self.canvas.create_line(4, y_mid, pos_x, y_mid, fill="#6366f1", width=rail_h, capstyle=self.tk.ROUND)
+
+        # Cabeza de reproducción (Playhead thumb)
+        r = 5
+        self.canvas.create_oval(pos_x - r, y_mid - r, pos_x + r, y_mid + r, fill="#ffffff", outline="#818cf8", width=1)
+
+    def _calc_pct(self, event):
+        w = self.canvas.winfo_width()
+        if w > 8:
+            eff_w = w - 8
+            rel_x = event.x - 4
+            return max(0.0, min(100.0, (rel_x / eff_w) * 100.0))
+        return 0.0
+
+    def _on_click(self, event):
+        self.is_dragging = True
+        self.progress = self._calc_pct(event)
+        self._draw()
+        if self.on_seek:
+            self.on_seek(self.progress)
+
+    def _on_drag(self, event):
+        self.is_dragging = True
+        self.progress = self._calc_pct(event)
+        self._draw()
+        if self.on_seek:
+            self.on_seek(self.progress)
+
+    def _on_release(self, event):
+        self.progress = self._calc_pct(event)
+        self._draw()
+        self.is_dragging = False
+        if self.on_seek:
+            self.on_seek(self.progress)
+
+
 def show_spotlight_tkinter(initial_query="", start_hidden=False):
     """Lanza la ventana flotante Spotlight / Raycast usando Tkinter (nativo en Windows y macOS)."""
     try:
@@ -343,8 +420,8 @@ def show_spotlight_tkinter(initial_query="", start_hidden=False):
             pass
 
     w = 540
-    h_base = 220
-    h_expanded = 430
+    h_base = 250
+    h_expanded = 460
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
     x = (sw - w) // 2
@@ -447,9 +524,12 @@ def show_spotlight_tkinter(initial_query="", start_hidden=False):
 
     # 1. Tarjeta Superior Now Playing
     np_card = tk.Frame(main_card, bg="#181922", highlightthickness=1, highlightbackground="#282937", padx=14, pady=10)
-    np_card.pack(fill=tk.X, pady=(0, 12))
+    np_card.pack(fill=tk.X, pady=(0, 10))
 
-    info_box = tk.Frame(np_card, bg="#181922")
+    np_top = tk.Frame(np_card, bg="#181922")
+    np_top.pack(fill=tk.X)
+
+    info_box = tk.Frame(np_top, bg="#181922")
     info_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     title, paused, activo = player.get_status()
@@ -460,15 +540,11 @@ def show_spotlight_tkinter(initial_query="", start_hidden=False):
     )
     lbl_title.pack(fill=tk.X)
 
-    cur, dur = player.get_playback_time()
-    time_str = f" [{cur} / {dur}]" if cur else ""
-    sub_text = ("▶ Reproduciendo ahora" + time_str) if activo else "Listo para reproducir música"
-    if paused:
-        sub_text = "⏸ En pausa" + time_str
+    sub_text = ("⏸ En pausa" if paused else "▶ Reproduciendo ahora") if activo else "Listo para reproducir música"
     lbl_sub = tk.Label(info_box, text=sub_text, bg="#181922", fg="#8c92a6", font=("Segoe UI", 9), anchor="w")
     lbl_sub.pack(fill=tk.X, pady=(2, 0))
 
-    ctrl_box = tk.Frame(np_card, bg="#181922")
+    ctrl_box = tk.Frame(np_top, bg="#181922")
     ctrl_box.pack(side=tk.RIGHT, padx=(8, 0))
 
     def make_btn(parent, text, cmd):
@@ -515,6 +591,22 @@ def show_spotlight_tkinter(initial_query="", start_hidden=False):
     btn_lyr.pack(side=tk.LEFT, padx=2)
     btn_hide = make_btn(ctrl_box, "✕", hide_to_tray)
     btn_hide.pack(side=tk.LEFT, padx=(5, 0))
+
+    # Línea interactiva de avance (Seek bar)
+    progress_frame = tk.Frame(np_card, bg="#181922")
+    progress_frame.pack(fill=tk.X, pady=(8, 0))
+
+    seek_bar = SeekBarWidget(progress_frame, on_seek_callback=lambda pct: player.seek_percent(pct))
+    seek_bar.pack(fill=tk.X)
+
+    time_row = tk.Frame(progress_frame, bg="#181922")
+    time_row.pack(fill=tk.X, pady=(2, 0))
+
+    lbl_time_cur = tk.Label(time_row, text="00:00", bg="#181922", fg="#7a7f98", font=("Segoe UI", 8))
+    lbl_time_cur.pack(side=tk.LEFT)
+
+    lbl_time_dur = tk.Label(time_row, text="00:00", bg="#181922", fg="#7a7f98", font=("Segoe UI", 8))
+    lbl_time_dur.pack(side=tk.RIGHT)
 
     # 2. Entrada de búsqueda
     entry_frame = tk.Frame(main_card, bg="#181922", highlightthickness=1, highlightbackground="#353748", padx=12, pady=8)
@@ -703,16 +795,24 @@ def show_spotlight_tkinter(initial_query="", start_hidden=False):
         try:
             t, p, a = player.get_status()
             if a and t and player.es_titulo_valido(t):
-                cur, dur = player.get_playback_time()
-                time_str = f" [{cur} / {dur}]" if cur else ""
-                lbl_title.config(text=f"🎵 {t[:32]}...")
-                lbl_sub.config(text=("⏸ En pausa" if p else "▶ Reproduciendo ahora") + time_str)
+                pos, dur, pct, cur_str, dur_str = player.get_progress()
+                lbl_title.config(text=f"🎵 {t[:30]}...")
+                lbl_sub.config(text="⏸ En pausa" if p else "▶ Reproduciendo ahora")
                 btn_pause.config(text="▶" if p else "⏸")
+                lbl_time_cur.config(text=cur_str)
+                lbl_time_dur.config(text=dur_str)
+                seek_bar.set_progress(pct)
                 if tray_icon_holder[0]:
                     try:
                         tray_icon_holder[0].title = f"Spotlight Music: {t[:40]}"
                     except Exception:
                         pass
+            else:
+                lbl_title.config(text="🎵 Spotlight Music")
+                lbl_sub.config(text="Listo para reproducir música")
+                seek_bar.set_progress(0.0)
+                lbl_time_cur.config(text="00:00")
+                lbl_time_dur.config(text="00:00")
             root.after(1000, auto_refresh)
         except Exception:
             pass

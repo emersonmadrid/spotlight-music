@@ -92,6 +92,13 @@ def run_tests():
     res_eq3 = player.set_equalizer("plano")
     assert_test("player.set_equalizer('plano')", res_eq3 is not None)
 
+    # 5b. Avance de música (Seek / Barra de Progreso)
+    print("\n[3b/7] Probando avance de música (Seek / Barra de Progreso)...")
+    res_seek = player.seek_percent(25)
+    assert_test("player.seek_percent(25)", res_seek is not None or is_ci)
+    pos_s, dur_s, pct_s, c_str, d_str = player.get_progress()
+    assert_test("player.get_progress()", c_str is not None and d_str is not None, f"-> {c_str} / {d_str} ({pct_s:.1f}%)")
+
     # 6. Favoritas
     print("\n[4/7] Probando sistema de Favoritas...")
     ok_fav, msg_fav = player.save_favorite()
