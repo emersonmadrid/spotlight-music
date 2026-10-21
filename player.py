@@ -107,30 +107,32 @@ def get_playback_time():
 
 
 def get_mpv_path():
-    """Localiza el binario de mpv: primero en la carpeta de la app, luego en PATH."""
+    """Localiza el binario de mpv: subcarpetas internas engine/ o bin/, carpeta raíz, o en PATH."""
     app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
-    if IS_WINDOWS:
-        candidate = os.path.join(app_dir, "mpv.exe")
-        if os.path.exists(candidate):
-            return candidate
-    else:
-        candidate = os.path.join(app_dir, "mpv")
-        if os.path.exists(candidate):
-            return candidate
+    exe_name = "mpv.exe" if IS_WINDOWS else "mpv"
+    candidates = [
+        os.path.join(app_dir, "engine", exe_name),
+        os.path.join(app_dir, "bin", exe_name),
+        os.path.join(app_dir, exe_name),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
     return "mpv"
 
 
 def get_ytdlp_path():
-    """Localiza el binario de yt-dlp: primero en la carpeta de la app, luego en PATH."""
+    """Localiza el binario de yt-dlp: subcarpetas internas engine/ o bin/, carpeta raíz, o en PATH."""
     app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
-    if IS_WINDOWS:
-        candidate = os.path.join(app_dir, "yt-dlp.exe")
-        if os.path.exists(candidate):
-            return candidate
-    else:
-        candidate = os.path.join(app_dir, "yt-dlp")
-        if os.path.exists(candidate):
-            return candidate
+    exe_name = "yt-dlp.exe" if IS_WINDOWS else "yt-dlp"
+    candidates = [
+        os.path.join(app_dir, "engine", exe_name),
+        os.path.join(app_dir, "bin", exe_name),
+        os.path.join(app_dir, exe_name),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
     return "yt-dlp"
 
 
@@ -175,10 +177,12 @@ def play(query):
         target
     ]
 
-    # Preparar entorno asegurando que yt-dlp local sea visible
+    # Preparar entorno asegurando que engine/ y bin/ locales sean visibles
     app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
     env = os.environ.copy()
-    env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
+    engine_dir = os.path.join(app_dir, "engine")
+    bin_dir = os.path.join(app_dir, "bin")
+    env["PATH"] = engine_dir + os.pathsep + bin_dir + os.pathsep + app_dir + os.pathsep + env.get("PATH", "")
 
     # Iniciar mpv en segundo plano desacoplado
     try:
@@ -329,7 +333,9 @@ def play_favorites():
     ]
     app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
     env = os.environ.copy()
-    env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
+    engine_dir = os.path.join(app_dir, "engine")
+    bin_dir = os.path.join(app_dir, "bin")
+    env["PATH"] = engine_dir + os.pathsep + bin_dir + os.pathsep + app_dir + os.pathsep + env.get("PATH", "")
 
     if IS_WINDOWS:
         creation_flags = 0x08000000  # CREATE_NO_WINDOW

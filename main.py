@@ -40,6 +40,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 import player
 import lyrics
+import single_instance
 
 try:
     import tkinter as tk
@@ -48,8 +49,12 @@ except ImportError:
     tk = None
 
 
-def show_spotlight_player(initial_query=""):
+def show_spotlight_player(initial_query="", start_hidden=False):
     """Lanza la ventana flotante Spotlight / Raycast."""
+    if sys.platform.startswith("win"):
+        show_spotlight_tkinter(initial_query, start_hidden=start_hidden)
+        return
+
     try:
         import gi
         gi.require_version('Gtk', '3.0')
@@ -57,7 +62,7 @@ def show_spotlight_player(initial_query=""):
         from gi.repository import Gtk, Gdk, GLib
     except (ImportError, ValueError):
         # Fallback universal nativo (Windows, macOS o Linux sin GTK3)
-        show_spotlight_tkinter(initial_query)
+        show_spotlight_tkinter(initial_query, start_hidden=start_hidden)
         return
 
     win = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
@@ -303,7 +308,7 @@ def show_spotlight_player(initial_query=""):
     Gtk.main()
 
 
-def show_spotlight_tkinter(initial_query=""):
+def show_spotlight_tkinter(initial_query="", start_hidden=False):
     """Lanza la ventana flotante Spotlight / Raycast usando Tkinter (nativo en Windows y macOS)."""
     try:
         import tkinter as tk
@@ -316,6 +321,14 @@ def show_spotlight_tkinter(initial_query=""):
     root.configure(bg="#121217")
     root.attributes("-topmost", True)
 
+    app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+    icon_ico = os.path.join(app_dir, "spotlight.ico")
+    if os.path.exists(icon_ico):
+        try:
+            root.iconbitmap(icon_ico)
+        except Exception:
+            pass
+
     w = 540
     h_base = 220
     h_expanded = 430
@@ -325,6 +338,96 @@ def show_spotlight_tkinter(initial_query=""):
     y = max(50, (sh - h_expanded) // 2)
     root.geometry(f"{w}x{h_base}+{x}+{y}")
     root.resizable(False, False)
+
+    def show_window():
+        root.deiconify()
+        root.lift()
+        root.focus_force()
+        root.attributes("-topmost", True)
+        root.attributes("-topmost", False)
+        entry.focus_set()
+
+    def hide_to_tray(event=None):
+        root.withdraw()
+
+    tray_icon_holder = [None]
+
+    def quit_app():
+        player.stop()
+        if tray_icon_holder[0]:
+            try:
+                tray_icon_holder[0].stop()
+            except Exception:
+                pass
+        try:
+            root.destroy()
+        except Exception:
+            pass
+        sys.exit(0)
+
+    # Registro de instancia única: si ya corre otra instancia, la nueva notifica y se cierra
+    def on_single_instance_command(data):
+        def process():
+            if data:
+                parts = data.split(" ", 1)
+                sub_arg = parts[1].strip() if len(parts) > 1 else ""
+                if sub_arg and sub_arg != "--tray":
+                    if sub_arg.startswith("play "):
+                        player.play(sub_arg[5:].strip())
+                    else:
+                        entry.delete(0, tk.END)
+                        entry.insert(0, sub_arg)
+                        on_search()
+            show_window()
+        root.after(0, process)
+
+    single_instance.check_and_bind_single_instance(on_single_instance_command)
+
+    # Inicialización de la bandeja del sistema (System Tray)
+    def init_tray():
+        try:
+            import pystray
+            from PIL import Image
+
+            icon_png = os.path.join(app_dir, "spotlight.png")
+            if os.path.exists(icon_png):
+                img = Image.open(icon_png)
+            else:
+                img = Image.new('RGB', (64, 64), color=(99, 102, 241))
+
+            def on_tray_open(icon, item):
+                root.after(0, show_window)
+
+            def on_tray_pause(icon, item):
+                player.pause()
+
+            def on_tray_next(icon, item):
+                player.next_track()
+
+            def on_tray_prev(icon, item):
+                player.prev_track()
+
+            def on_tray_fav(icon, item):
+                player.save_favorite()
+
+            def on_tray_exit(icon, item):
+                root.after(0, quit_app)
+
+            menu = pystray.Menu(
+                pystray.MenuItem("🔍 Abrir Spotlight Music", on_tray_open, default=True),
+                pystray.MenuItem("⏯️ Pausar / Reanudar", on_tray_pause),
+                pystray.MenuItem("⏭️ Siguiente canción", on_tray_next),
+                pystray.MenuItem("⏮️ Canción anterior", on_tray_prev),
+                pystray.MenuItem("⭐ Guardar en Favoritas", on_tray_fav),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("❌ Salir de Spotlight Music", on_tray_exit)
+            )
+            tray_icon_holder[0] = pystray.Icon("SpotlightMusic", img, "Spotlight Music", menu)
+            tray_icon_holder[0].run()
+        except Exception:
+            pass
+
+    threading.Thread(target=init_tray, daemon=True).start()
 
     main_card = tk.Frame(root, bg="#121217", padx=18, pady=16)
     main_card.pack(fill=tk.BOTH, expand=True)
@@ -388,15 +491,17 @@ def show_spotlight_tkinter(initial_query=""):
         lbl_sub.config(text=f"⭐ {msg}")
 
     btn_prev = make_btn(ctrl_box, "⏮", do_prev)
-    btn_prev.pack(side=tk.LEFT, padx=3)
+    btn_prev.pack(side=tk.LEFT, padx=2)
     btn_pause = make_btn(ctrl_box, "▶" if paused else "⏸", do_pause)
-    btn_pause.pack(side=tk.LEFT, padx=3)
+    btn_pause.pack(side=tk.LEFT, padx=2)
     btn_next = make_btn(ctrl_box, "⏭", do_next)
-    btn_next.pack(side=tk.LEFT, padx=3)
+    btn_next.pack(side=tk.LEFT, padx=2)
     btn_fav = make_btn(ctrl_box, "❤️", do_fav)
-    btn_fav.pack(side=tk.LEFT, padx=3)
+    btn_fav.pack(side=tk.LEFT, padx=2)
     btn_lyr = make_btn(ctrl_box, "🎤", lambda: threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start())
-    btn_lyr.pack(side=tk.LEFT, padx=3)
+    btn_lyr.pack(side=tk.LEFT, padx=2)
+    btn_hide = make_btn(ctrl_box, "✕", hide_to_tray)
+    btn_hide.pack(side=tk.LEFT, padx=(5, 0))
 
     # 2. Entrada de búsqueda
     entry_frame = tk.Frame(main_card, bg="#181922", highlightthickness=1, highlightbackground="#353748", padx=12, pady=8)
@@ -430,7 +535,7 @@ def show_spotlight_tkinter(initial_query=""):
     entry.bind("<FocusOut>", on_focus_out)
 
     lbl_hint = tk.Label(
-        main_card, text="💡 Presiona Enter para buscar canciones • Esc para cerrar",
+        main_card, text="💡 Presiona Enter para buscar • Esc o ✕ para minimizar a la bandeja",
         bg="#121217", fg="#7a7f98", font=("Segoe UI", 8), anchor="w"
     )
     lbl_hint.pack(fill=tk.X, pady=(0, 8))
@@ -503,17 +608,38 @@ def show_spotlight_tkinter(initial_query=""):
 
         def fetch():
             items = []
+            # 1. Búsqueda directa en memoria usando yt_dlp (máxima velocidad, sin procesos externos)
             try:
-                ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
-                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--extractor-args", "youtube:player_client=android,web_creator", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-                out, _ = proc.communicate(timeout=8)
-                for line in out.strip().splitlines():
-                    if "\t" in line:
-                        t, vid = line.split("\t", 1)
-                        items.append((t.strip(), f"https://www.youtube.com/watch?v={vid.strip()}"))
-            except Exception as e:
+                import yt_dlp
+                ydl_opts = {
+                    'quiet': True,
+                    'no_warnings': True,
+                    'extract_flat': True,
+                    'extractor_args': {'youtube': {'player_client': ['android', 'web_creator']}},
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    res = ydl.extract_info(f"ytsearch6:{q} audio", download=False)
+                    for entry_data in res.get('entries', []):
+                        t = entry_data.get('title')
+                        vid = entry_data.get('id')
+                        if t and vid:
+                            items.append((t.strip(), f"https://www.youtube.com/watch?v={vid.strip()}"))
+            except Exception:
                 pass
+
+            # 2. Respaldo por si el módulo interno no resuelve
+            if not items:
+                try:
+                    ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
+                    cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--extractor-args", "youtube:player_client=android,web_creator", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
+                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                    out, _ = proc.communicate(timeout=8)
+                    for line in out.strip().splitlines():
+                        if "\t" in line:
+                            t, vid = line.split("\t", 1)
+                            items.append((t.strip(), f"https://www.youtube.com/watch?v={vid.strip()}"))
+                except Exception:
+                    pass
 
             def update_ui():
                 listbox.delete(0, tk.END)
@@ -544,7 +670,8 @@ def show_spotlight_tkinter(initial_query=""):
                 listbox.selection_set(0)
 
     entry.bind("<Down>", on_down_arrow)
-    root.bind("<Escape>", lambda e: root.destroy())
+    root.protocol("WM_DELETE_WINDOW", hide_to_tray)
+    root.bind("<Escape>", hide_to_tray)
 
     def auto_refresh():
         try:
@@ -555,12 +682,21 @@ def show_spotlight_tkinter(initial_query=""):
                 lbl_title.config(text=f"🎵 {t[:32]}...")
                 lbl_sub.config(text=("⏸ En pausa" if p else "▶ Reproduciendo ahora") + time_str)
                 btn_pause.config(text="▶" if p else "⏸")
+                if tray_icon_holder[0]:
+                    try:
+                        tray_icon_holder[0].title = f"Spotlight Music: {t[:40]}"
+                    except Exception:
+                        pass
             root.after(1000, auto_refresh)
         except Exception:
             pass
 
     root.after(1000, auto_refresh)
-    entry.focus_set()
+    if start_hidden:
+        root.withdraw()
+    else:
+        entry.focus_set()
+
     root.mainloop()
 
 
@@ -697,7 +833,10 @@ def main():
     if not args:
         show_spotlight_player()
     elif args[0] in ("tray", "--tray"):
-        run_tray()
+        if sys.platform.startswith("win"):
+            show_spotlight_player(start_hidden=True)
+        else:
+            run_tray()
     elif args[0] in ("search", "gui", "-s"):
         q = " ".join(args[1:]) if len(args) > 1 else ""
         show_spotlight_player(q)

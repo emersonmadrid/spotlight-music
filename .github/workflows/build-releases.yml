@@ -18,14 +18,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: SpotlightMusic-Windows-x64.zip
-            asset_name: SpotlightMusic-Windows-x64
+            artifact_name: dist_release/*
+            asset_name: SpotlightMusic-Windows
           - os: ubuntu-latest
-            artifact_name: SpotlightMusic-Linux-x64.tar.gz
-            asset_name: SpotlightMusic-Linux-x64
+            artifact_name: dist_release/*
+            asset_name: SpotlightMusic-Linux
           - os: macos-latest
-            artifact_name: SpotlightMusic-macOS-x64.tar.gz
-            asset_name: SpotlightMusic-macOS-x64
+            artifact_name: dist_release/*
+            asset_name: SpotlightMusic-macOS
 
     steps:
       - name: Checkout repository
@@ -53,36 +53,48 @@ jobs:
           sudo apt-get install -y mpv
           python test_suite.py
 
-      - name: Build with PyInstaller (Windows)
+      - name: Build with PyInstaller and Inno Setup (Windows)
         if: runner.os == 'Windows'
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name SpotlightMusic main.py
+          pyinstaller --noconfirm --onefile --windowed --icon spotlight.ico --add-data "spotlight.ico;." --add-data "spotlight.png;." --name SpotlightMusic main.py
           
-          # Descargar motor de audio mpv portable para Windows
+          # Crear carpeta interna engine para el motor de audio mpv
+          New-Item -ItemType Directory -Force -Path dist\engine
+          
+          # Descargar motor de audio mpv portable para Windows y guardarlo en engine/
           curl.exe -sL https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261019/mpv-x86_64-20261019-git-6a262d11f6.7z -o mpv.7z
-          7z e mpv.7z mpv.exe -odist -y
+          7z e mpv.7z mpv.exe -odist\engine -y
           Remove-Item mpv.7z -ErrorAction SilentlyContinue
 
-          # Descargar extractor yt-dlp.exe para Windows
-          curl.exe -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o dist\yt-dlp.exe
+          # Incluir vulkan-1.dll dentro de engine/
+          Copy-Item bin\windows\vulkan-1.dll -Destination dist\engine\vulkan-1.dll
+          Copy-Item spotlight.ico -Destination dist\spotlight.ico
+          Copy-Item spotlight.png -Destination dist\spotlight.png
 
-          # Incluir vulkan-1.dll para compatibilidad con máquinas virtuales y Windows sin drivers dedicados
-          Copy-Item bin\windows\vulkan-1.dll -Destination dist\vulkan-1.dll
+          # Compilar el Instalador Visual con Inno Setup
+          New-Item -ItemType Directory -Force -Path dist_installer
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\setup.iss
 
-          # Empaquetar todo junto (Zero dependencies, 100% portable)
-          Compress-Archive -Path dist\SpotlightMusic.exe, dist\mpv.exe, dist\yt-dlp.exe, dist\vulkan-1.dll, install_windows.bat, README.md, LICENSE, DISCLAIMER.md -DestinationPath SpotlightMusic-Windows-x64.zip
+          # Preparar carpeta de salida para release
+          New-Item -ItemType Directory -Force -Path dist_release
+          Copy-Item dist_installer\SpotlightMusic_Setup.exe -Destination dist_release\SpotlightMusic_Setup.exe
+
+          # Crear paquete portable (Zero loose yt-dlp.exe, motor mpv limpio en engine/)
+          Compress-Archive -Path dist\SpotlightMusic.exe, dist\engine, dist\spotlight.ico, README.md, LICENSE, DISCLAIMER.md -DestinationPath dist_release\SpotlightMusic-Windows-x64.zip
 
       - name: Build with PyInstaller (Linux)
         if: runner.os == 'Linux'
         run: |
           pyinstaller --noconfirm --onefile --name spotlight-music main.py
-          tar -czf SpotlightMusic-Linux-x64.tar.gz -C dist spotlight-music
+          mkdir -p dist_release
+          tar -czf dist_release/SpotlightMusic-Linux-x64.tar.gz -C dist spotlight-music
 
       - name: Build with PyInstaller (macOS)
         if: runner.os == 'macOS'
         run: |
           pyinstaller --noconfirm --onefile --name spotlight-music main.py
-          tar -czf SpotlightMusic-macOS-x64.tar.gz -C dist spotlight-music
+          mkdir -p dist_release
+          tar -czf dist_release/SpotlightMusic-macOS-x64.tar.gz -C dist spotlight-music
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -119,11 +131,12 @@ jobs:
           tag_name: rolling
           name: "Spotlight Music - Última Versión Compilada (Rolling)"
           body: |
-            ## 🎵 Descarga directa de ejecutables actualizados automáticamente
+            ## 🎵 Descarga directa de ejecutables oficiales
 
             Cada vez que el código se modifica, GitHub compila y publica automáticamente estos ejecutables oficiales:
 
-            * 🪟 **Windows:** [SpotlightMusic-Windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-Windows-x64.zip) *(Descomprimir y dar doble clic)*
+            * 🪟 **Windows (Instalador Asistente Visual):** [SpotlightMusic_Setup.exe](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic_Setup.exe) *(Recomendado - Instalación en 2 clics con Siguiente, Siguiente)*
+            * 📦 **Windows (Portable):** [SpotlightMusic-Windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-Windows-x64.zip) *(Sin instalación, descomprimir y ejecutar)*
             * 🐧 **Linux:** [SpotlightMusic-Linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-Linux-x64.tar.gz)
             * 🍏 **macOS:** [SpotlightMusic-macOS-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/rolling/SpotlightMusic-macOS-x64.tar.gz)
 
