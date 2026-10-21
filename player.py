@@ -312,26 +312,37 @@ def play_favorites():
         f.write("\n".join(urls) + "\n")
 
     stop()
+    mpv_bin = get_mpv_path()
+    log_file = os.path.join(os.environ.get("TEMP", os.environ.get("TMP", ".")), "spotlight_mpv.log") if IS_WINDOWS else "/tmp/spotlight_mpv.log"
     cmd = [
-        "mpv",
+        mpv_bin,
         "--no-video",
         "--volume=85",
+        "--audio-exclusive=no",
+        "--ao=wasapi,openal,",
         "--shuffle",
         "--af=dynaudnorm",
+        "--ytdl-raw-options=yes-playlist=,playlist-end=30,extractor-args=youtube:player_client=android",
         f"--input-ipc-server={SOCKET_PATH}",
+        f"--log-file={log_file}",
         f"--playlist={temp_playlist}"
     ]
+    app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
+    env = os.environ.copy()
+    env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
+
     if IS_WINDOWS:
         creation_flags = 0x08000000 | 0x00000008
-        subprocess.Popen(cmd, creationflags=creation_flags)
+        subprocess.Popen(cmd, creationflags=creation_flags, env=env)
     elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
         subprocess.run(["systemctl", "--user", "reset-failed", "bg-musica"], stderr=subprocess.DEVNULL)
         subprocess.Popen(
             ["systemd-run", "--user", "--unit=bg-musica"] + cmd,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            env=env
         )
     else:
-        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, env=env)
 
     return True, "Reproduciendo tus canciones favoritas"
