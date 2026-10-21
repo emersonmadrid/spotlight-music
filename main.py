@@ -266,7 +266,7 @@ def show_spotlight_player(initial_query=""):
             items = []
             try:
                 ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
-                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
+                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--extractor-args", "youtube:player_client=android,web_creator", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
                 out, _ = proc.communicate(timeout=7)
                 for line in out.strip().splitlines():
@@ -505,7 +505,7 @@ def show_spotlight_tkinter(initial_query=""):
             items = []
             try:
                 ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
-                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
+                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--extractor-args", "youtube:player_client=android,web_creator", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
                 out, _ = proc.communicate(timeout=8)
                 for line in out.strip().splitlines():

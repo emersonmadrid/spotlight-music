@@ -169,7 +169,7 @@ def play(query):
         "--volume=100",
         "--audio-exclusive=no",
         "--ao=wasapi,openal,",
-        "--ytdl-raw-options=yes-playlist=,playlist-end=30",
+        "--ytdl-raw-options=yes-playlist=,playlist-end=30,extractor-args=youtube:player_client=android",
         f"--input-ipc-server={SOCKET_PATH}",
         f"--log-file={log_file}",
         target
