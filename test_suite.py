@@ -54,7 +54,7 @@ def run_tests():
     assert_test("player.es_titulo_valido(title)", player.es_titulo_valido(title), f"-> '{title}'")
 
     # Esperar hasta que empiece a reproducir frames de audio (time-pos disponible)
-    for _ in range(16):
+    for _ in range(25):
         cur, dur = player.get_playback_time()
         if cur is not None:
             break

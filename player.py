@@ -183,7 +183,7 @@ def play(query):
     # Iniciar mpv en segundo plano desacoplado
     try:
         if IS_WINDOWS:
-            creation_flags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
+            creation_flags = 0x08000000  # CREATE_NO_WINDOW (sin DETACHED_PROCESS para no romper pipes de yt-dlp)
             subprocess.Popen(
                 cmd,
                 stdin=subprocess.DEVNULL,
@@ -332,8 +332,15 @@ def play_favorites():
     env["PATH"] = app_dir + os.pathsep + env.get("PATH", "")
 
     if IS_WINDOWS:
-        creation_flags = 0x08000000 | 0x00000008
-        subprocess.Popen(cmd, creationflags=creation_flags, env=env)
+        creation_flags = 0x08000000  # CREATE_NO_WINDOW
+        subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
+            env=env
+        )
     elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
         subprocess.run(["systemctl", "--user", "reset-failed", "bg-musica"], stderr=subprocess.DEVNULL)
         subprocess.Popen(
