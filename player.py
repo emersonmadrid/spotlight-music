@@ -270,18 +270,19 @@ def save_favorite():
     """Guarda la canción que suena actualmente en la lista de favoritos."""
     title = get_property("media-title")
     path = get_property("path")
-    if not path:
+    if not path and not title:
         return False, "No hay música sonando"
 
+    target_entry = path or title
     if os.path.exists(FAVS_FILE):
         with open(FAVS_FILE, "r", encoding="utf-8") as f:
-            if path in f.read():
-                return True, f"Ya estaba en favoritos: {title}"
+            if target_entry in f.read():
+                return True, f"Ya estaba en favoritos: {title or target_entry}"
 
     with open(FAVS_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{path} # {title or 'Sin título'} [{time.strftime('%Y-%m-%d')}]\n")
+        f.write(f"{target_entry} # {title or 'Sin título'} [{time.strftime('%Y-%m-%d')}]\n")
 
-    return True, f"Guardada en favoritos: {title}"
+    return True, f"Guardada en favoritos: {title or target_entry}"
 
 
 def play_favorites():
@@ -289,15 +290,22 @@ def play_favorites():
     if not os.path.exists(FAVS_FILE) or os.path.getsize(FAVS_FILE) == 0:
         return False, "Aún no tienes canciones favoritas guardadas"
 
-    urls = []
+    entries = []
     with open(FAVS_FILE, "r", encoding="utf-8") as f:
         for line in f:
-            match = re.match(r'^(https?://[^\s#]+)', line.strip())
-            if match:
-                urls.append(match.group(1))
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            item = line.split("#")[0].strip()
+            if item:
+                entries.append(item)
 
-    if not urls:
-        return False, "No se encontraron enlaces en favoritos"
+    if not entries:
+        return False, "No se encontraron temas en favoritos"
+
+    import random
+    random.shuffle(entries)
+    return play(entries[0])
 
     temp_playlist = "/tmp/mpv_favoritas.m3u" if not IS_WINDOWS else os.path.expanduser(r"~\mpv_favs.m3u")
     with open(temp_playlist, "w", encoding="utf-8") as f:
