@@ -66,8 +66,9 @@ jobs:
           7z e mpv.7z mpv.exe -odist\engine -y
           Remove-Item mpv.7z -ErrorAction SilentlyContinue
 
-          # Incluir vulkan-1.dll dentro de engine/
+          # Incluir vulkan-1.dll y yt-dlp.exe dentro de engine/
           Copy-Item bin\windows\vulkan-1.dll -Destination dist\engine\vulkan-1.dll
+          curl.exe -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o dist\engine\yt-dlp.exe
           Copy-Item spotlight.ico -Destination dist\spotlight.ico
           Copy-Item spotlight.png -Destination dist\spotlight.png
 
