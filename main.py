@@ -265,7 +265,8 @@ def show_spotlight_player(initial_query=""):
         def fetch():
             items = []
             try:
-                cmd = ["yt-dlp", "--no-warnings", "--flat-playlist", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
+                ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
+                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
                 out, _ = proc.communicate(timeout=7)
                 for line in out.strip().splitlines():
@@ -315,112 +316,229 @@ def show_spotlight_tkinter(initial_query=""):
     root.configure(bg="#121217")
     root.attributes("-topmost", True)
 
-    w, h = 520, 180
+    w = 540
+    h_base = 220
+    h_expanded = 430
     sw = root.winfo_screenwidth()
     sh = root.winfo_screenheight()
     x = (sw - w) // 2
-    y = (sh - h) // 2
-    root.geometry(f"{w}x{h}+{x}+{y}")
+    y = max(50, (sh - h_expanded) // 2)
+    root.geometry(f"{w}x{h_base}+{x}+{y}")
     root.resizable(False, False)
 
-    frame = tk.Frame(root, bg="#121217", padx=20, pady=16)
-    frame.pack(fill=tk.BOTH, expand=True)
+    main_card = tk.Frame(root, bg="#121217", padx=18, pady=16)
+    main_card.pack(fill=tk.BOTH, expand=True)
+
+    # 1. Tarjeta Superior Now Playing
+    np_card = tk.Frame(main_card, bg="#181922", highlightthickness=1, highlightbackground="#282937", padx=14, pady=10)
+    np_card.pack(fill=tk.X, pady=(0, 12))
+
+    info_box = tk.Frame(np_card, bg="#181922")
+    info_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     title, paused, activo = player.get_status()
-    header_text = f"🎵 {title[:40]}..." if (activo and title) else "🎵 Spotlight Music"
+    lbl_title = tk.Label(
+        info_box,
+        text=f"🎵 {title[:32]}..." if (activo and title) else "🎵 Spotlight Music",
+        bg="#181922", fg="#ffffff", font=("Segoe UI", 11, "bold"), anchor="w"
+    )
+    lbl_title.pack(fill=tk.X)
+
+    cur, dur = player.get_playback_time()
+    time_str = f" [{cur} / {dur}]" if cur else ""
+    sub_text = ("▶ Reproduciendo ahora" + time_str) if activo else "Listo para reproducir música"
     if paused:
-        header_text += " (Pausado)"
+        sub_text = "⏸ En pausa" + time_str
+    lbl_sub = tk.Label(info_box, text=sub_text, bg="#181922", fg="#8c92a6", font=("Segoe UI", 9), anchor="w")
+    lbl_sub.pack(fill=tk.X, pady=(2, 0))
 
-    lbl_status = tk.Label(frame, text=header_text, bg="#121217", fg="#ffffff", font=("Segoe UI", 11, "bold"), anchor="w")
-    lbl_status.pack(fill=tk.X, pady=(0, 10))
+    ctrl_box = tk.Frame(np_card, bg="#181922")
+    ctrl_box.pack(side=tk.RIGHT, padx=(8, 0))
 
-    ctrl_frame = tk.Frame(frame, bg="#121217")
-    ctrl_frame.pack(fill=tk.X, pady=(0, 12))
-
-    def do_pause():
-        player.pause()
-        t, p, a = player.get_status()
-        lbl_status.config(text=(f"🎵 {t[:40]}..." if t else "🎵 Spotlight Music") + (" (Pausado)" if p else ""))
-
-    def do_next():
-        player.next_track()
-
-    def do_prev():
-        player.prev_track()
-
-    def do_lyrics():
-        threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start()
-
-    def do_fav():
-        ok, msg = player.save_favorite()
-        lbl_status.config(text=f"⭐ {msg}")
-
-    btn_style = {"bg": "#22232e", "fg": "#c5c8d6", "activebackground": "#303242", "activeforeground": "#ffffff", "bd": 0, "padx": 10, "pady": 4, "font": ("Segoe UI", 9, "bold"), "cursor": "hand2"}
+    def make_btn(parent, text, cmd):
+        b = tk.Button(
+            parent, text=text, command=cmd, bg="#252633", fg="#ffffff",
+            activebackground="#353648", activeforeground="#ffffff", bd=0, padx=8, pady=4,
+            font=("Segoe UI", 9, "bold"), cursor="hand2"
+        )
+        b.bind("<Enter>", lambda e: b.config(bg="#353648"))
+        b.bind("<Leave>", lambda e: b.config(bg="#252633"))
+        return b
 
     def do_pause():
         player.pause()
         t, p, a = player.get_status()
-        cur, dur = player.get_playback_time()
-        time_str = f" [{cur} / {dur}]" if cur else ""
-        lbl_status.config(text=(f"🎵 {t[:35]}...{time_str}" if t else "🎵 Spotlight Music") + (" (Pausado)" if p else ""))
-        btn_pause.config(text="▶ Play" if p else "⏸ Pausa")
+        btn_pause.config(text="▶" if p else "⏸")
+        lbl_sub.config(text="⏸ En pausa" if p else "▶ Reproduciendo ahora")
 
     def do_next():
         player.next_track()
-        lbl_status.config(text="⏳ Pasando a siguiente...")
+        lbl_title.config(text="⏳ Cargando canción...")
+        lbl_sub.config(text="Saltando pista...")
 
     def do_prev():
         player.prev_track()
-        lbl_status.config(text="⏳ Volviendo a anterior...")
-
-    def do_lyrics():
-        threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start()
+        lbl_title.config(text="⏳ Cargando canción...")
+        lbl_sub.config(text="Volviendo a anterior...")
 
     def do_fav():
         ok, msg = player.save_favorite()
-        lbl_status.config(text=f"⭐ {msg}")
+        btn_fav.config(text="💖")
+        root.after(1500, lambda: btn_fav.config(text="❤️"))
+        lbl_sub.config(text=f"⭐ {msg}")
 
-    tk.Button(ctrl_frame, text="⏮ Prev", command=do_prev, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
-    btn_pause = tk.Button(ctrl_frame, text="⏸ Pausa", command=do_pause, **btn_style)
-    btn_pause.pack(side=tk.LEFT, padx=(0, 6))
-    tk.Button(ctrl_frame, text="⏭ Next", command=do_next, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
-    tk.Button(ctrl_frame, text="❤️ Fav", command=do_fav, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
-    tk.Button(ctrl_frame, text="🎤 Letra", command=do_lyrics, **btn_style).pack(side=tk.LEFT, padx=(0, 6))
+    btn_prev = make_btn(ctrl_box, "⏮", do_prev)
+    btn_prev.pack(side=tk.LEFT, padx=3)
+    btn_pause = make_btn(ctrl_box, "▶" if paused else "⏸", do_pause)
+    btn_pause.pack(side=tk.LEFT, padx=3)
+    btn_next = make_btn(ctrl_box, "⏭", do_next)
+    btn_next.pack(side=tk.LEFT, padx=3)
+    btn_fav = make_btn(ctrl_box, "❤️", do_fav)
+    btn_fav.pack(side=tk.LEFT, padx=3)
+    btn_lyr = make_btn(ctrl_box, "🎤", lambda: threading.Thread(target=lyrics.show_lyrics_window, daemon=True).start())
+    btn_lyr.pack(side=tk.LEFT, padx=3)
 
-    entry = tk.Entry(frame, bg="#1c1d26", fg="#ffffff", insertbackground="#ffffff", font=("Segoe UI", 12), bd=0, highlightthickness=1, highlightbackground="#353748", highlightcolor="#6366f1")
-    entry.pack(fill=tk.X, pady=(0, 8), ipady=6)
+    # 2. Entrada de búsqueda
+    entry_frame = tk.Frame(main_card, bg="#181922", highlightthickness=1, highlightbackground="#353748", padx=12, pady=8)
+    entry_frame.pack(fill=tk.X, pady=(0, 6))
+
+    placeholder_text = "🔍 Escribe cualquier canción, artista o género..."
+    entry = tk.Entry(
+        entry_frame, bg="#181922", fg="#7a7f98", insertbackground="#ffffff",
+        font=("Segoe UI", 11), bd=0
+    )
     if initial_query:
         entry.insert(0, initial_query)
-    entry.focus_set()
+        entry.config(fg="#ffffff")
+    else:
+        entry.insert(0, placeholder_text)
+    entry.pack(fill=tk.X)
 
-    lbl_info = tk.Label(frame, text="Escribe una canción o artista y presiona Enter • Esc para cerrar", bg="#121217", fg="#7a7f98", font=("Segoe UI", 9))
-    lbl_info.pack(fill=tk.X)
-
-    def on_enter(event=None):
-        q = entry.get().strip()
-        if q:
+    def on_focus_in(event):
+        entry_frame.config(highlightbackground="#6366f1")
+        if entry.get() == placeholder_text:
             entry.delete(0, tk.END)
-            lbl_info.config(text="🔍 Conectando con YouTube Music...", fg="#818cf8")
-            lbl_status.config(text=f"⏳ Buscando: {q}...")
-            root.update()
+            entry.config(fg="#ffffff")
 
-            def start_bg():
-                ok = player.play(q)
-                if not ok:
-                    lbl_status.config(text="❌ Error al iniciar reproductor")
-                    lbl_info.config(text="Verifica tu conexión o los componentes de audio", fg="#ef4444")
-                    return
-                for _ in range(25):
-                    time.sleep(0.5)
-                    t, p, a = player.get_status()
-                    if a and t and player.es_titulo_valido(t):
-                        cur, dur = player.get_playback_time()
-                        time_str = f" [{cur} / {dur}]" if cur else ""
-                        lbl_status.config(text=f"🎵 {t[:35]}...{time_str}")
-                        lbl_info.config(text="▶ Reproduciendo ahora • Esc para cerrar", fg="#34d399")
-                        break
+    def on_focus_out(event):
+        entry_frame.config(highlightbackground="#353748")
+        if not entry.get().strip():
+            entry.insert(0, placeholder_text)
+            entry.config(fg="#7a7f98")
 
-            threading.Thread(target=start_bg, daemon=True).start()
+    entry.bind("<FocusIn>", on_focus_in)
+    entry.bind("<FocusOut>", on_focus_out)
+
+    lbl_hint = tk.Label(
+        main_card, text="💡 Presiona Enter para buscar canciones • Esc para cerrar",
+        bg="#121217", fg="#7a7f98", font=("Segoe UI", 8), anchor="w"
+    )
+    lbl_hint.pack(fill=tk.X, pady=(0, 8))
+
+    # 3. Lista de resultados (inicialmente oculta)
+    results_frame = tk.Frame(main_card, bg="#171822", highlightthickness=1, highlightbackground="#282937", padx=4, pady=4)
+    result_items = []
+
+    listbox = tk.Listbox(
+        results_frame, bg="#171822", fg="#e2e4ee", selectbackground="#2e3040",
+        selectforeground="#ffffff", font=("Segoe UI", 10), bd=0, highlightthickness=0,
+        activestyle="none", height=6
+    )
+    listbox.pack(fill=tk.BOTH, expand=True)
+
+    def on_select_result(event=None):
+        sel = listbox.curselection()
+        if sel and sel[0] < len(result_items):
+            title, url = result_items[sel[0]]
+            lbl_title.config(text=f"⏳ Cargando: {title[:32]}...")
+            lbl_sub.config(text="Iniciando streaming...")
+            player.play(url)
+            root.destroy()
+
+    listbox.bind("<Double-Button-1>", on_select_result)
+    listbox.bind("<Return>", on_select_result)
+
+    # 4. Chips de acceso rápido
+    chips_frame = tk.Frame(main_card, bg="#121217")
+    chips_frame.pack(fill=tk.X)
+
+    def make_chip(parent, text, action):
+        b = tk.Button(
+            parent, text=text, command=lambda: (action(), root.destroy()),
+            bg="#1a1a24", fg="#b0b4c8", activebackground="#272836", activeforeground="#ffffff",
+            bd=0, padx=9, pady=5, font=("Segoe UI", 9), cursor="hand2"
+        )
+        b.bind("<Enter>", lambda e: b.config(bg="#272836", fg="#ffffff"))
+        b.bind("<Leave>", lambda e: b.config(bg="#1a1a24", fg="#b0b4c8"))
+        return b
+
+    chips = [
+        ("⭐ Favoritas", lambda: player.play_favorites()),
+        ("☕ Lo-Fi", lambda: player.play("lofi hip hop radio beats to relax study")),
+        ("🎻 Clásica", lambda: player.play("classical music for concentration studying")),
+        ("🎷 Jazz", lambda: player.play("relaxing jazz instrumental coffee shop")),
+        ("🎧 Bass Boost", lambda: player.set_equalizer("bass")),
+    ]
+    for label, act in chips:
+        make_chip(chips_frame, label, act).pack(side=tk.LEFT, padx=(0, 6))
+
+    def on_search(event=None):
+        q = entry.get().strip()
+        if not q or q == placeholder_text:
+            return
+
+        lbl_hint.config(text=f"⏳ Buscando '{q}' en YouTube...")
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 12), before=chips_frame)
+        root.geometry(f"{w}x{h_expanded}+{x}+{y}")
+        listbox.delete(0, tk.END)
+        result_items.clear()
+        listbox.insert(tk.END, "  ⏳ Cargando resultados...")
+        root.update()
+
+        def fetch():
+            items = []
+            try:
+                ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
+                cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                out, _ = proc.communicate(timeout=8)
+                for line in out.strip().splitlines():
+                    if "\t" in line:
+                        t, vid = line.split("\t", 1)
+                        items.append((t.strip(), f"https://www.youtube.com/watch?v={vid.strip()}"))
+            except Exception as e:
+                pass
+
+            def update_ui():
+                listbox.delete(0, tk.END)
+                result_items.clear()
+                if items:
+                    lbl_hint.config(text="✅ Usa ↑ / ↓ y presiona Enter para reproducir:")
+                    for t, u in items:
+                        result_items.append((t, u))
+                        listbox.insert(tk.END, f"  🎵  {t}")
+                    listbox.selection_set(0)
+                    listbox.focus_set()
+                else:
+                    lbl_hint.config(text="❌ No se encontraron resultados. Presiona Enter para reproducir directo:")
+                    result_items.append((q, q))
+                    listbox.insert(tk.END, f"  ▶  Reproducir directo: '{q}'")
+                    listbox.selection_set(0)
+                    listbox.focus_set()
+            root.after(0, update_ui)
+
+        threading.Thread(target=fetch, daemon=True).start()
+
+    entry.bind("<Return>", on_search)
+
+    def on_down_arrow(event):
+        if results_frame.winfo_ismapped() and listbox.size() > 0:
+            listbox.focus_set()
+            if not listbox.curselection():
+                listbox.selection_set(0)
+
+    entry.bind("<Down>", on_down_arrow)
+    root.bind("<Escape>", lambda e: root.destroy())
 
     def auto_refresh():
         try:
@@ -428,19 +546,15 @@ def show_spotlight_tkinter(initial_query=""):
             if a and t and player.es_titulo_valido(t):
                 cur, dur = player.get_playback_time()
                 time_str = f" [{cur} / {dur}]" if cur else ""
-                text = f"🎵 {t[:35]}...{time_str}"
-                if p:
-                    text += " (Pausado)"
-                lbl_status.config(text=text)
-                btn_pause.config(text="▶ Play" if p else "⏸ Pausa")
+                lbl_title.config(text=f"🎵 {t[:32]}...")
+                lbl_sub.config(text=("⏸ En pausa" if p else "▶ Reproduciendo ahora") + time_str)
+                btn_pause.config(text="▶" if p else "⏸")
             root.after(1000, auto_refresh)
         except Exception:
             pass
 
-    entry.bind("<Return>", on_enter)
-    root.bind("<Escape>", lambda e: root.destroy())
     root.after(1000, auto_refresh)
-
+    entry.focus_set()
     root.mainloop()
 
 

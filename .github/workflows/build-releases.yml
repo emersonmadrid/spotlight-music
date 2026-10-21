@@ -47,6 +47,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller -r requirements.txt
 
+      - name: Run Automated Test Suite
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y mpv
+          python test_suite.py
+
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         run: |

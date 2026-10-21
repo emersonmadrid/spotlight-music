@@ -76,7 +76,8 @@ def es_titulo_valido(t):
     if not t:
         return False
     s = str(t).strip()
-    if s.startswith("watch?v=") or s.startswith("ytdl://") or s.startswith("http://") or s.startswith("https://"):
+    if (s.startswith("watch?v=") or s.startswith("ytdl://") or s.startswith("ytsearch") or
+        s.startswith("http://") or s.startswith("https://") or s.startswith("ytdl:")):
         return False
     if len(s) == 11 and " " not in s:
         return False
@@ -117,6 +118,20 @@ def get_mpv_path():
         if os.path.exists(candidate):
             return candidate
     return "mpv"
+
+
+def get_ytdlp_path():
+    """Localiza el binario de yt-dlp: primero en la carpeta de la app, luego en PATH."""
+    app_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]))
+    if IS_WINDOWS:
+        candidate = os.path.join(app_dir, "yt-dlp.exe")
+        if os.path.exists(candidate):
+            return candidate
+    else:
+        candidate = os.path.join(app_dir, "yt-dlp")
+        if os.path.exists(candidate):
+            return candidate
+    return "yt-dlp"
 
 
 def play(query):
@@ -241,13 +256,14 @@ def set_volume(level):
 def set_equalizer(profile):
     """Ajusta los filtros de ecualización en tiempo real."""
     profiles = {
-        "bass": "lavfi=[equalizer=f=64:t=q:w=1:g=8],dynaudnorm",
-        "voz": "lavfi=[equalizer=f=1000:t=q:w=1:g=5],dynaudnorm",
-        "brillo": "lavfi=[equalizer=f=8000:t=q:w=1:g=6],dynaudnorm",
-        "plano": "dynaudnorm",
+        "bass": "lavfi=[equalizer=f=64:t=q:w=1:g=8]",
+        "voz": "lavfi=[equalizer=f=1000:t=q:w=1:g=5]",
+        "brillo": "lavfi=[equalizer=f=8000:t=q:w=1:g=6]",
+        "plano": "",
     }
-    filter_val = profiles.get(profile, "dynaudnorm")
-    return send_mpv_command(["af", "set", filter_val])
+    filter_val = profiles.get(profile, "")
+    res = set_property("af", filter_val)
+    return res is not None and res.get("error") == "success"
 
 
 def save_favorite():
