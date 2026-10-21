@@ -105,7 +105,7 @@ def run_tests():
     artist, track, raw = lyrics.get_current_track_info()
     assert_test("lyrics.get_current_track_info()", track != "", f"-> Artista: '{artist}', Track: '{track}'")
 
-    lyr = lyrics.fetch_lyrics(artist or "Kudai", track or "Sin Despertar")
+    lyr = lyrics.fetch_lyrics("Kudai", "Sin Despertar")
     has_lyrics = len(lyr) > 50 and "❌ No se encontró" not in lyr
     assert_test("lyrics.fetch_lyrics()", has_lyrics, f"-> {len(lyr)} caracteres obtenidos")
 
