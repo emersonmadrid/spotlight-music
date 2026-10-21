@@ -168,6 +168,8 @@ def play(query):
     cmd = [
         mpv_bin,
         "--no-video",
+        "--terminal=no",
+        "--msg-level=all=no",
         "--volume=100",
         "--audio-exclusive=no",
         "--ao=wasapi,openal,",
@@ -187,13 +189,17 @@ def play(query):
     # Iniciar mpv en segundo plano desacoplado
     try:
         if IS_WINDOWS:
-            creation_flags = 0x08000000  # CREATE_NO_WINDOW (sin DETACHED_PROCESS para no romper pipes de yt-dlp)
+            creation_flags = 0x08000000  # CREATE_NO_WINDOW
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  # SW_HIDE
             subprocess.Popen(
                 cmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 creationflags=creation_flags,
+                startupinfo=startupinfo,
                 env=env
             )
         elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):
@@ -247,7 +253,17 @@ def stop():
         subprocess.run(["systemctl", "--user", "stop", "bg-musica"], stderr=subprocess.DEVNULL)
     send_mpv_command(["quit"])
     if IS_WINDOWS:
-        subprocess.run(["taskkill", "/F", "/IM", "mpv.exe"], stderr=subprocess.DEVNULL)
+        creation_flags = 0x08000000  # CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "mpv.exe"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
+            startupinfo=startupinfo
+        )
     else:
         subprocess.run(["pkill", "-f", SOCKET_PATH], stderr=subprocess.DEVNULL)
 
@@ -321,6 +337,8 @@ def play_favorites():
     cmd = [
         mpv_bin,
         "--no-video",
+        "--terminal=no",
+        "--msg-level=all=no",
         "--volume=85",
         "--audio-exclusive=no",
         "--ao=wasapi,openal,",
@@ -339,12 +357,16 @@ def play_favorites():
 
     if IS_WINDOWS:
         creation_flags = 0x08000000  # CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0  # SW_HIDE
         subprocess.Popen(
             cmd,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=creation_flags,
+            startupinfo=startupinfo,
             env=env
         )
     elif IS_LINUX and os.path.exists("/usr/bin/systemd-run"):

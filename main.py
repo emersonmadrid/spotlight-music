@@ -272,7 +272,20 @@ def show_spotlight_player(initial_query="", start_hidden=False):
             try:
                 ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
                 cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--extractor-args", "youtube:player_client=android,web_creator", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                creation_flags = 0x08000000 if sys.platform.startswith("win") else 0
+                startupinfo = None
+                if sys.platform.startswith("win"):
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0  # SW_HIDE
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    creationflags=creation_flags,
+                    startupinfo=startupinfo
+                )
                 out, _ = proc.communicate(timeout=7)
                 for line in out.strip().splitlines():
                     if "\t" in line:
@@ -632,7 +645,20 @@ def show_spotlight_tkinter(initial_query="", start_hidden=False):
                 try:
                     ytdlp_bin = player.get_ytdlp_path() if hasattr(player, 'get_ytdlp_path') else "yt-dlp"
                     cmd = [ytdlp_bin, "--no-warnings", "--flat-playlist", "--extractor-args", "youtube:player_client=android,web_creator", "--print", "%(title)s\t%(id)s", f"ytsearch6:{q} audio"]
-                    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                    creation_flags = 0x08000000 if sys.platform.startswith("win") else 0
+                    startupinfo = None
+                    if sys.platform.startswith("win"):
+                        startupinfo = subprocess.STARTUPINFO()
+                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                        startupinfo.wShowWindow = 0  # SW_HIDE
+                    proc = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        text=True,
+                        creationflags=creation_flags,
+                        startupinfo=startupinfo
+                    )
                     out, _ = proc.communicate(timeout=8)
                     for line in out.strip().splitlines():
                         if "\t" in line:
