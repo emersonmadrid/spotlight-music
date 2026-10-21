@@ -38,9 +38,12 @@ def fetch_lyrics(artist, track):
     if not track:
         return "⚠️ No hay ninguna canción reproduciéndose actualmente."
 
+    # Limpiar sufijos como (Acústico / Visualiser), [Official Video], etc.
+    clean_track = re.sub(r'[\(\[].*?[\)\]]', '', track).strip() or track
+
     # 1. LRCLIB (máxima calidad tipográfica y sincronización)
     try:
-        q = urllib.parse.quote(f"{artist} {track}".strip())
+        q = urllib.parse.quote(f"{artist} {clean_track}".strip())
         url = f"https://lrclib.net/api/search?q={q}"
         req = urllib.request.Request(url, headers={"User-Agent": "SpotlightMusic/1.0"})
         with urllib.request.urlopen(req, timeout=4) as resp:
