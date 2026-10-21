@@ -452,8 +452,8 @@ def show_spotlight_tkinter(initial_query=""):
             title, url = result_items[sel[0]]
             lbl_title.config(text=f"⏳ Cargando: {title[:32]}...")
             lbl_sub.config(text="Iniciando streaming...")
+            root.update()
             player.play(url)
-            root.destroy()
 
     listbox.bind("<Double-Button-1>", on_select_result)
     listbox.bind("<Return>", on_select_result)
@@ -463,8 +463,14 @@ def show_spotlight_tkinter(initial_query=""):
     chips_frame.pack(fill=tk.X)
 
     def make_chip(parent, text, action):
+        def on_click():
+            lbl_title.config(text=f"⏳ Activando: {text}...")
+            lbl_sub.config(text="Cargando playlist / perfil...")
+            root.update()
+            action()
+
         b = tk.Button(
-            parent, text=text, command=lambda: (action(), root.destroy()),
+            parent, text=text, command=on_click,
             bg="#1a1a24", fg="#b0b4c8", activebackground="#272836", activeforeground="#ffffff",
             bd=0, padx=9, pady=5, font=("Segoe UI", 9), cursor="hand2"
         )
